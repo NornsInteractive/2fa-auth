@@ -4,6 +4,7 @@ import { hashPassword } from '../utils/crypto';
 import { storage } from '../utils/storage';
 import { useTokenStore } from './useTokenStore';
 import { useCategoryStore } from './useCategoryStore';
+import { useProviderStore } from './useProviderStore';
 
 export interface StoredAccount {
   id: string;
@@ -34,6 +35,7 @@ interface AuthState {
 
 const SESSION_STORAGE_KEY = 'fortress_session_v2';
 const USERS_REGISTRY_KEY = 'fortress_users_registry_v2';
+const VAULT_LOCK_STORAGE_KEY = 'fortress_vault_lock_v2';
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -106,10 +108,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       await storage.set(SESSION_STORAGE_KEY, user);
+      await storage.set(VAULT_LOCK_STORAGE_KEY, false);
 
-      // Load user-isolated tokens and categories (will be empty for new account)
+      // Load user-isolated tokens, categories, and providers
       await useTokenStore.getState().loadTokens(userId);
       await useCategoryStore.getState().loadCategories(userId);
+      await useProviderStore.getState().loadProviders(userId);
 
       return { success: true };
     } catch (e: any) {
@@ -182,10 +186,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
 
       await storage.set(SESSION_STORAGE_KEY, user);
+      await storage.set(VAULT_LOCK_STORAGE_KEY, false);
 
       // Load strictly isolated data for this user
       await useTokenStore.getState().loadTokens(user.id);
       await useCategoryStore.getState().loadCategories(user.id);
+      await useProviderStore.getState().loadProviders(user.id);
 
       return { success: true };
     } catch (e: any) {
@@ -194,45 +200,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   biometricLogin: async () => {
-    try {
-      const accounts = await storage.get<StoredAccount[]>(USERS_REGISTRY_KEY, []);
-      if (accounts.length === 0) {
-        return { success: false, error: '暂无可快速登录的账号，请先注册' };
-      }
-
-      // Login to last logged account
-      const lastSession = await storage.get<User | null>(SESSION_STORAGE_KEY, null);
-      const targetAccount = lastSession
-        ? accounts.find((a) => a.id === lastSession.id) || accounts[0]
-        : accounts[0];
-
-      const user: User = {
-        id: targetAccount.id,
-        name: targetAccount.name,
-        email: targetAccount.email,
-        securityLevel: targetAccount.securityLevel,
-        avatarUrl: targetAccount.avatarUrl,
-        biometricsEnabled: true,
-        autoLockMinutes: 5,
-        createdAt: targetAccount.createdAt,
-      };
-
-      set({
-        user,
-        isAuthenticated: true,
-        isLocked: false,
-        masterPasswordHash: targetAccount.passwordHash,
-        lastActiveTimestamp: Date.now(),
-      });
-
-      await storage.set(SESSION_STORAGE_KEY, user);
-      await useTokenStore.getState().loadTokens(user.id);
-      await useCategoryStore.getState().loadCategories(user.id);
-
-      return { success: true };
-    } catch (e: any) {
-      return { success: false, error: '生物识别登录失败' };
-    }
+    return { success: false, error: '生物识别功能开发中，暂不可用' };
   },
 
   unlockVault: async (masterPassword: string) => {
@@ -248,11 +216,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
 
     set({ isLocked: false, lastActiveTimestamp: Date.now() });
+    await storage.set(VAULT_LOCK_STORAGE_KEY, false);
     return { success: true };
   },
 
   lockVault: () => {
     set({ isLocked: true });
+    storage.set(VAULT_LOCK_STORAGE_KEY, true);
   },
 
   logout: async () => {
@@ -263,6 +233,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       masterPasswordHash: null,
     });
     await storage.remove(SESSION_STORAGE_KEY);
+    await storage.remove(VAULT_LOCK_STORAGE_KEY);
     // Clear in-memory tokens
     useTokenStore.setState({ tokens: [], searchQuery: '', selectedProvider: 'all' });
   },
@@ -277,6 +248,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   loadAuth: async () => {
     const savedUser = await storage.get<User | null>(SESSION_STORAGE_KEY, null);
+    const savedLock = await storage.get<boolean>(VAULT_LOCK_STORAGE_KEY, false);
+
     if (savedUser) {
       const accounts = await storage.get<StoredAccount[]>(USERS_REGISTRY_KEY, []);
       const account = accounts.find((a) => a.id === savedUser.id);
@@ -284,12 +257,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({
         user: savedUser,
         isAuthenticated: true,
-        isLocked: false,
+        isLocked: savedLock,
         masterPasswordHash: account ? account.passwordHash : null,
       });
 
       await useTokenStore.getState().loadTokens(savedUser.id);
       await useCategoryStore.getState().loadCategories(savedUser.id);
+      await useProviderStore.getState().loadProviders(savedUser.id);
     } else {
       set({
         user: null,

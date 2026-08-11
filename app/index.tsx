@@ -14,7 +14,9 @@ import { FortressBottomNav } from '../src/components/common/FortressBottomNav';
 import { CategoryChips } from '../src/components/common/CategoryChips';
 import { AddTokenModal } from '../src/components/token/AddTokenModal';
 import { AddCategoryModal } from '../src/components/category/AddCategoryModal';
+import { TokenDetailModal } from '../src/components/token/TokenDetailModal';
 import { Icon } from '../src/components/common/Icon';
+import { Token } from '../src/types/token';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -39,6 +41,8 @@ export default function HomeScreen() {
 
   const [addTokenVisible, setAddTokenVisible] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedDetailToken, setSelectedDetailToken] = useState<Token | null>(null);
 
   // Check auth and redirect if not logged in
   useEffect(() => {
@@ -73,6 +77,11 @@ export default function HomeScreen() {
     });
   }, [tokens, selectedCategoryId, selectedProvider, searchQuery]);
 
+  const handleOpenDetail = (tok: Token) => {
+    setSelectedDetailToken(tok);
+    setDetailModalVisible(true);
+  };
+
   if (!isAuthenticated || !user) {
     return null;
   }
@@ -103,11 +112,15 @@ export default function HomeScreen() {
               <View style={[styles.cardsGrid, isDesktop && styles.desktopGrid]}>
                 {filteredTokens.map((tok) => (
                   <View key={tok.id} style={isDesktop ? styles.gridCardCol : undefined}>
-                    <TokenCard token={tok} remainingSeconds={remainingSeconds} />
+                    <TokenCard
+                      token={tok}
+                      remainingSeconds={remainingSeconds}
+                      onOpenDetail={handleOpenDetail}
+                    />
                   </View>
                 ))}
 
-                {/* Desktop Add Account Tile */}
+                {/* Desktop Add Key Card */}
                 {isDesktop && (
                   <View style={styles.gridCardCol}>
                     <TouchableOpacity
@@ -130,7 +143,7 @@ export default function HomeScreen() {
                         <Icon name="add" size={28} color={palette.onSecondaryContainer} />
                       </View>
                       <Text style={[styles.addPlaceholderTitle, { color: palette.onSurface }]}>
-                        {t('addNewAccountCard', language)}
+                        {language === 'zh' ? '新增密钥' : 'Add 2FA Key'}
                       </Text>
                       <Text style={[styles.addPlaceholderSub, { color: palette.onSurfaceVariant }]}>
                         {t('scanOrEnterKey', language)}
@@ -167,7 +180,7 @@ export default function HomeScreen() {
                   </Text>
                   <Text style={[styles.addPlaceholderSub, { color: palette.onSurfaceVariant }]}>
                     {language === 'zh'
-                      ? '点击此处或顶部“新增密钥”按钮，添加您的第一个两步验证账号'
+                      ? '点击此处或顶部“新增密钥”按钮，添加您的第一个两步验证密钥'
                       : 'Click here or top "+ Add Token" button to create your first 2FA secret key'}
                   </Text>
                 </TouchableOpacity>
@@ -210,6 +223,13 @@ export default function HomeScreen() {
       <AddCategoryModal
         visible={addCategoryVisible}
         onClose={() => setAddCategoryVisible(false)}
+      />
+
+      {/* Token Detail Modal (Modal view on click) */}
+      <TokenDetailModal
+        visible={detailModalVisible}
+        token={selectedDetailToken}
+        onClose={() => setDetailModalVisible(false)}
       />
     </View>
   );

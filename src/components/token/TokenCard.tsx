@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
 import { Token } from '../../types/token';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useTokenStore } from '../../store/useTokenStore';
@@ -15,10 +14,10 @@ import { ProgressRing } from '../common/ProgressRing';
 interface TokenCardProps {
   token: Token;
   remainingSeconds: number;
+  onOpenDetail?: (token: Token) => void;
 }
 
-export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds }) => {
-  const router = useRouter();
+export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds, onOpenDetail }) => {
   const { showToast } = useToast();
   const themeMode = useSettingsStore((s) => s.themeMode);
   const themeColor = useSettingsStore((s) => s.themeColor);
@@ -59,10 +58,6 @@ export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds })
     }, 1500);
   };
 
-  const handleNavigateDetail = () => {
-    router.push(`/token/${token.id}`);
-  };
-
   // Determine icon
   const getIconName = (type?: string, issuer?: string) => {
     if (type) {
@@ -85,7 +80,7 @@ export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds })
   return (
     <TouchableOpacity
       activeOpacity={0.85}
-      onPress={handleNavigateDetail}
+      onPress={handleCopy}
       style={[
         styles.card,
         {
@@ -123,22 +118,39 @@ export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds })
           </View>
         </View>
 
-        {/* Category tag */}
-        {category && category.id !== 'all' && (
-          <View
-            style={[
-              styles.categoryBadge,
-              {
-                backgroundColor: palette.secondaryContainer,
-                borderColor: palette.outlineVariant,
-              },
-            ]}
-          >
-            <Text style={[styles.categoryBadgeText, { color: palette.onSecondaryContainer }]}>
-              {category.nameKey ? t(category.nameKey as any, language) : category.name}
-            </Text>
-          </View>
-        )}
+        <View style={styles.headerRight}>
+          {/* Category tag */}
+          {category && category.id !== 'all' && (
+            <View
+              style={[
+                styles.categoryBadge,
+                {
+                  backgroundColor: palette.secondaryContainer,
+                  borderColor: palette.outlineVariant,
+                },
+              ]}
+            >
+              <Text style={[styles.categoryBadgeText, { color: palette.onSecondaryContainer }]}>
+                {category.nameKey ? t(category.nameKey as any, language) : category.name}
+              </Text>
+            </View>
+          )}
+
+          {/* Details / Edit Button */}
+          {onOpenDetail && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={(e) => {
+                e.stopPropagation();
+                onOpenDetail(token);
+              }}
+              style={[styles.detailButton, { backgroundColor: palette.surfaceContainerLow }]}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Icon name="more_vert" size={18} color={palette.onSurfaceVariant} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Code & Timer Row */}
@@ -165,19 +177,16 @@ export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds })
             trackColor={palette.surfaceVariant}
           />
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleCopy}
+          <View
             style={[
               styles.copyButton,
               {
                 backgroundColor: palette.surfaceContainerLow,
               },
             ]}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Icon name="content_copy" size={18} color={palette.onSurfaceVariant} />
-          </TouchableOpacity>
+            <Icon name="content_copy" size={18} color={palette.primary} />
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -233,6 +242,11 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     marginTop: 2,
   },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   categoryBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -243,6 +257,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 10,
     fontWeight: '600',
+  },
+  detailButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   codeRow: {
     flexDirection: 'row',
@@ -267,6 +289,5 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'pointer',
   },
 });

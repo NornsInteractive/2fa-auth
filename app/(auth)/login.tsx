@@ -193,18 +193,26 @@ export default function LoginScreen() {
               {/* Biometric Button */}
               <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={handleBiometric}
+                onPress={() =>
+                  showToast(
+                    language === 'zh'
+                      ? '生物识别功能开发中，暂不可用，请使用主密码登录'
+                      : 'Biometric login is in development, please use master password',
+                    'info'
+                  )
+                }
                 style={[
                   styles.biometricButton,
                   {
                     backgroundColor: palette.surfaceContainerHigh,
                     borderColor: palette.outlineVariant,
+                    opacity: 0.8,
                   },
                 ]}
               >
-                <Icon name="fingerprint" size={24} color={palette.primary} />
-                <Text style={[styles.biometricButtonText, { color: palette.onSurface }]}>
-                  {t('biometricLogin', language)}
+                <Icon name="fingerprint" size={24} color={palette.onSurfaceVariant} />
+                <Text style={[styles.biometricButtonText, { color: palette.onSurfaceVariant }]}>
+                  {language === 'zh' ? '生物识别登录 (功能开发中)' : 'Biometric Login (In Dev)'}
                 </Text>
               </TouchableOpacity>
             </View>

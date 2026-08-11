@@ -8,7 +8,9 @@ import { generateBackupCodes, generateRandomSecret, parseOtpAuthUri } from '../.
 import { useToast } from '../common/Toast';
 import { t } from '../../utils/i18n';
 import { Icon } from '../common/Icon';
-import { OTPAlgorithm } from '../../types/token';
+import { CustomField, OTPAlgorithm } from '../../types/token';
+import { ProviderPickerModal } from '../common/ProviderPickerModal';
+import { CategoryPickerModal } from '../common/CategoryPickerModal';
 
 interface AddTokenModalProps {
   visible: boolean;
@@ -28,15 +30,23 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
 
   const [uriInput, setUriInput] = useState('');
   const [issuer, setIssuer] = useState('');
+  const [iconType, setIconType] = useState('shield');
   const [accountName, setAccountName] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('work');
+  const [backupCodesText, setBackupCodesText] = useState('');
+  const [notes, setNotes] = useState('');
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [algorithm, setAlgorithm] = useState<OTPAlgorithm>('SHA1');
   const [digits, setDigits] = useState<number>(6);
   const [period, setPeriod] = useState<number>(30);
-  const [notes, setNotes] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  const [providerPickerVisible, setProviderPickerVisible] = useState(false);
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
+
+  const currentCategory = categories.find((c) => c.id === selectedCategory) || categories[0];
 
   const handleUriChange = (val: string) => {
     setUriInput(val);
@@ -57,9 +67,33 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
   const handleGenerateTestKey = () => {
     const key = generateRandomSecret(20);
     setSecretKey(key);
-    if (!issuer) setIssuer('Fortress Test');
-    if (!accountName) setAccountName('user@test.io');
+    if (!issuer) setIssuer('Google');
+    if (!accountName) setAccountName('user@domain.com');
     setErrorMessage('');
+  };
+
+  const handleGenerateBackupCodes = () => {
+    const codes = generateBackupCodes(10);
+    setBackupCodesText(codes.join('\n'));
+  };
+
+  const handleAddCustomField = () => {
+    const newField: CustomField = {
+      id: `cf_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      key: '',
+      value: '',
+    };
+    setCustomFields([...customFields, newField]);
+  };
+
+  const handleUpdateCustomField = (id: string, field: 'key' | 'value', text: string) => {
+    setCustomFields(
+      customFields.map((f) => (f.id === id ? { ...f, [field]: text } : f))
+    );
+  };
+
+  const handleDeleteCustomField = (id: string) => {
+    setCustomFields(customFields.filter((f) => f.id !== id));
   };
 
   const handleSubmit = async () => {
@@ -77,17 +111,27 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
       return;
     }
 
+    // Parse backup codes
+    const backupCodes = backupCodesText
+      .split(/[\n, ]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const validCustomFields = customFields.filter((f) => f.key.trim() && f.value.trim());
+
     try {
       await addTokenMutation.mutateAsync({
         issuer: issuer.trim(),
         accountName: accountName.trim(),
         secretKey: cleanKey,
         categoryId: selectedCategory,
+        iconType,
         algorithm,
         digits,
         period,
-        notes,
-        backupCodes: generateBackupCodes(10),
+        notes: notes.trim(),
+        backupCodes,
+        customFields: validCustomFields,
       });
 
       showToast(t('tokenAddedSuccess', language), 'check_circle');
@@ -101,13 +145,16 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
   const handleReset = () => {
     setUriInput('');
     setIssuer('');
+    setIconType('shield');
     setAccountName('');
     setSecretKey('');
     setSelectedCategory('work');
+    setBackupCodesText('');
+    setNotes('');
+    setCustomFields([]);
     setAlgorithm('SHA1');
     setDigits(6);
     setPeriod(30);
-    setNotes('');
     setErrorMessage('');
     setShowAdvanced(false);
   };
@@ -131,7 +178,7 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
                 <Icon name="shield_lock" size={20} color="#ffffff" fill />
               </View>
               <Text style={[styles.modalTitle, { color: palette.onSurface }]}>
-                {t('addTokenTitle', language)}
+                {language === 'zh' ? '新增密钥' : 'Add New 2FA Key'}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -143,7 +190,7 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
             {/* Quick OTPAuth URI Input */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
-                {t('pasteOtpUri', language)}
+                {t('pasteOtpUri', language)} (可选)
               </Text>
               <TextInput
                 style={[
@@ -161,30 +208,38 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
               />
             </View>
 
-            {/* Issuer & Account */}
+            {/* Provider Selection Button (Opens Fuzzy-search ProviderPickerModal) */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
-                {t('issuerLabel', language)} *
+                {language === 'zh' ? '提供商 (Issuer)' : 'Provider / Issuer'} *
               </Text>
-              <TextInput
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setProviderPickerVisible(true)}
                 style={[
-                  styles.input,
+                  styles.pickerTrigger,
                   {
                     backgroundColor: palette.surface,
                     borderColor: palette.outlineVariant,
-                    color: palette.onSurface,
                   },
                 ]}
-                placeholder={t('issuerPlaceholder', language)}
-                placeholderTextColor={palette.outline}
-                value={issuer}
-                onChangeText={(v) => {
-                  setIssuer(v);
-                  setErrorMessage('');
-                }}
-              />
+              >
+                <View style={styles.pickerTriggerLeft}>
+                  <Icon name={iconType || 'hub'} size={18} color={palette.primary} />
+                  <Text
+                    style={[
+                      styles.pickerTriggerText,
+                      { color: issuer ? palette.onSurface : palette.outline },
+                    ]}
+                  >
+                    {issuer || (language === 'zh' ? '点击搜索选择提供商 (如 Google, GitHub...)' : 'Click to select provider')}
+                  </Text>
+                </View>
+                <Icon name="arrow_drop_down" size={20} color={palette.onSurfaceVariant} />
+              </TouchableOpacity>
             </View>
 
+            {/* Account Name */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
                 {t('accountNameLabel', language)} *
@@ -241,51 +296,143 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
               />
             </View>
 
-            {/* Category Selection */}
+            {/* Category Selection (Opens Fuzzy-search CategoryPickerModal) */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
                 {t('categorySelectLabel', language)}
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.catScroll}>
-                {categories.map((c) => {
-                  const isSelected = selectedCategory === c.id;
-                  return (
-                    <TouchableOpacity
-                      key={c.id}
-                      activeOpacity={0.7}
-                      onPress={() => setSelectedCategory(c.id)}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => setCategoryPickerVisible(true)}
+                style={[
+                  styles.pickerTrigger,
+                  {
+                    backgroundColor: palette.surface,
+                    borderColor: palette.outlineVariant,
+                  },
+                ]}
+              >
+                <View style={styles.pickerTriggerLeft}>
+                  <Icon name={currentCategory?.icon || 'folder'} size={18} color={currentCategory?.color || palette.primary} />
+                  <Text style={[styles.pickerTriggerText, { color: palette.onSurface }]}>
+                    {currentCategory?.nameKey ? t(currentCategory.nameKey as any, language) : currentCategory?.name || '选择分类'}
+                  </Text>
+                </View>
+                <Icon name="arrow_drop_down" size={20} color={palette.onSurfaceVariant} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Optional Fields Section: Backup Codes, Notes, Custom Fields */}
+            <View style={[styles.optionalSection, { backgroundColor: palette.surfaceContainerLow, borderColor: palette.outlineVariant }]}>
+              <Text style={[styles.optionalSectionTitle, { color: palette.primary }]}>
+                {language === 'zh' ? '附加安全信息 (非必填)' : 'Additional Security Info (Optional)'}
+              </Text>
+
+              {/* Backup Codes */}
+              <View style={styles.formGroup}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
+                    {language === 'zh' ? '备份恢复码 (Recovery Codes)' : 'Backup Recovery Codes'}
+                  </Text>
+                  <TouchableOpacity onPress={handleGenerateBackupCodes}>
+                    <Text style={[styles.helperAction, { color: palette.primary }]}>
+                      {language === 'zh' ? '自动生成10组' : 'Generate 10 Codes'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <TextInput
+                  style={[
+                    styles.textArea,
+                    styles.monoInput,
+                    {
+                      backgroundColor: palette.surface,
+                      borderColor: palette.outlineVariant,
+                      color: palette.onSurface,
+                    },
+                  ]}
+                  placeholder={language === 'zh' ? '每行输入一个恢复码，或空格隔开' : 'Enter recovery codes (one per line)...'}
+                  placeholderTextColor={palette.outline}
+                  value={backupCodesText}
+                  onChangeText={setBackupCodesText}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+
+              {/* Notes */}
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
+                  {t('notesLabel', language)}
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: palette.surface,
+                      borderColor: palette.outlineVariant,
+                      color: palette.onSurface,
+                    },
+                  ]}
+                  placeholder={language === 'zh' ? '添加备注信息 (如注册邮箱、安全提示)...' : 'Add notes or security hints...'}
+                  placeholderTextColor={palette.outline}
+                  value={notes}
+                  onChangeText={setNotes}
+                />
+              </View>
+
+              {/* Custom Key-Value Fields */}
+              <View style={styles.formGroup}>
+                <View style={styles.labelRow}>
+                  <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
+                    {language === 'zh' ? '自定义字段 (Key-Value)' : 'Custom Fields'}
+                  </Text>
+                  <TouchableOpacity onPress={handleAddCustomField}>
+                    <Text style={[styles.helperAction, { color: palette.primary }]}>
+                      {language === 'zh' ? '+ 添加字段' : '+ Add Field'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {customFields.map((cf) => (
+                  <View key={cf.id} style={styles.customFieldRow}>
+                    <TextInput
                       style={[
-                        styles.catPill,
+                        styles.customFieldInput,
                         {
-                          backgroundColor: isSelected
-                            ? palette.primaryContainer
-                            : palette.surfaceContainerLow,
-                          borderColor: isSelected ? palette.primary : palette.outlineVariant,
+                          backgroundColor: palette.surface,
+                          borderColor: palette.outlineVariant,
+                          color: palette.onSurface,
                         },
                       ]}
+                      placeholder={language === 'zh' ? '字段名 (如 PIN/手机)' : 'Field Name'}
+                      placeholderTextColor={palette.outline}
+                      value={cf.key}
+                      onChangeText={(txt) => handleUpdateCustomField(cf.id, 'key', txt)}
+                    />
+                    <TextInput
+                      style={[
+                        styles.customFieldInput,
+                        {
+                          backgroundColor: palette.surface,
+                          borderColor: palette.outlineVariant,
+                          color: palette.onSurface,
+                          flex: 1.5,
+                        },
+                      ]}
+                      placeholder={language === 'zh' ? '字段值' : 'Value'}
+                      placeholderTextColor={palette.outline}
+                      value={cf.value}
+                      onChangeText={(txt) => handleUpdateCustomField(cf.id, 'value', txt)}
+                    />
+                    <TouchableOpacity
+                      onPress={() => handleDeleteCustomField(cf.id)}
+                      style={[styles.deleteCfBtn, { backgroundColor: palette.surface }]}
                     >
-                      <Icon
-                        name={c.icon || 'folder'}
-                        size={14}
-                        color={isSelected ? palette.onPrimaryContainer : palette.onSurfaceVariant}
-                      />
-                      <Text
-                        style={[
-                          styles.catPillText,
-                          {
-                            color: isSelected
-                              ? palette.onPrimaryContainer
-                              : palette.onSurfaceVariant,
-                            fontWeight: isSelected ? '700' : '500',
-                          },
-                        ]}
-                      >
-                        {c.nameKey ? t(c.nameKey as any, language) : c.name}
-                      </Text>
+                      <Icon name="close" size={16} color={palette.error} />
                     </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+                  </View>
+                ))}
+              </View>
             </View>
 
             {/* Advanced Toggle */}
@@ -345,27 +492,6 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
                     ))}
                   </View>
                 </View>
-
-                {/* Notes */}
-                <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
-                    {t('notesLabel', language)}
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: palette.surface,
-                        borderColor: palette.outlineVariant,
-                        color: palette.onSurface,
-                      },
-                    ]}
-                    placeholder="可选备注..."
-                    placeholderTextColor={palette.outline}
-                    value={notes}
-                    onChangeText={setNotes}
-                  />
-                </View>
               </View>
             )}
 
@@ -400,6 +526,26 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
           </View>
         </View>
       </View>
+
+      {/* Provider Picker Modal */}
+      <ProviderPickerModal
+        visible={providerPickerVisible}
+        selectedProviderName={issuer}
+        onSelect={(pName, pIcon) => {
+          setIssuer(pName);
+          if (pIcon) setIconType(pIcon);
+          setErrorMessage('');
+        }}
+        onClose={() => setProviderPickerVisible(false)}
+      />
+
+      {/* Category Picker Modal */}
+      <CategoryPickerModal
+        visible={categoryPickerVisible}
+        selectedCategoryId={selectedCategory}
+        onSelect={(cId) => setSelectedCategory(cId)}
+        onClose={() => setCategoryPickerVisible(false)}
+      />
     </Modal>
   );
 };
@@ -482,31 +628,76 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 14,
   },
+  textArea: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 13,
+    minHeight: 70,
+  },
+  pickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    cursor: 'pointer',
+  },
+  pickerTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  pickerTriggerText: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 14,
+  },
   monoInput: {
     fontFamily: 'JetBrains Mono, monospace',
     letterSpacing: 1.5,
   },
-  catScroll: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-  },
-  catPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
+  optionalSection: {
+    padding: 14,
+    borderRadius: 14,
     borderWidth: 1,
-    marginRight: 8,
+    marginBottom: 14,
+    gap: 4,
   },
-  catPillText: {
+  optionalSectionTitle: {
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  customFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  customFieldInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 13,
+  },
+  deleteCfBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   advancedToggle: {
-    marginVertical: 8,
+    marginVertical: 6,
   },
   advancedToggleText: {
     fontFamily: 'Inter, system-ui, sans-serif',

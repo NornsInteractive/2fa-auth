@@ -278,17 +278,46 @@ export default function SettingsScreen() {
                 ]}
               >
                 <View style={styles.rowInfo}>
-                  <Text style={[styles.rowTitle, { color: palette.onSurface }]}>
-                    {t('biometricLabel', language)}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text style={[styles.rowTitle, { color: palette.onSurface }]}>
+                      {t('biometricLabel', language)}
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: palette.surfaceVariant,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: palette.onSurfaceVariant,
+                          fontWeight: '600',
+                        }}
+                      >
+                        {language === 'zh' ? '开发中' : 'In Dev'}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={[styles.rowSub, { color: palette.onSurfaceVariant }]}>
-                    指纹 / Face ID 快速进入
+                    {language === 'zh'
+                      ? '指纹 / Face ID 快速进入 (功能开发中，暂不可用)'
+                      : 'Fingerprint / Face ID (Feature in development, currently unavailable)'}
                   </Text>
                 </View>
                 <Switch
-                  value={biometricsEnabled}
-                  onValueChange={setBiometricsEnabled}
-                  thumbColor={biometricsEnabled ? palette.primary : '#ccc'}
+                  value={false}
+                  onValueChange={() =>
+                    showToast(
+                      language === 'zh'
+                        ? '生物识别功能开发中，暂不可用'
+                        : 'Biometric feature is in development',
+                      'info'
+                    )
+                  }
+                  thumbColor={'#ccc'}
                   trackColor={{ false: '#767577', true: palette.secondaryContainer }}
                 />
               </View>

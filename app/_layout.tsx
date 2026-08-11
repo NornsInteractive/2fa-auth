@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Platform, useWindowDimensions, Text, TextInput, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Platform, useWindowDimensions, Text, TextInput, TouchableOpacity, Image } from 'react-native';
 import { Slot, useRouter, usePathname } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { TamaguiProvider } from 'tamagui';
@@ -19,7 +19,6 @@ export default function RootLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 768;
 
   const themeMode = useSettingsStore((s) => s.themeMode);
   const themeColor = useSettingsStore((s) => s.themeColor);
@@ -33,6 +32,7 @@ export default function RootLayout() {
   const lastActiveTimestamp = useAuthStore((s) => s.lastActiveTimestamp);
   const unlockVault = useAuthStore((s) => s.unlockVault);
   const lockVault = useAuthStore((s) => s.lockVault);
+  const logout = useAuthStore((s) => s.logout);
   const loadAuth = useAuthStore((s) => s.loadAuth);
   const touchActive = useAuthStore((s) => s.touchActive);
 
@@ -51,8 +51,6 @@ export default function RootLayout() {
   useEffect(() => {
     loadSettings();
     loadAuth();
-    loadCategories();
-    loadTokens();
   }, []);
 
   // Global 1-second TOTP clock timer & auto-lock monitor
@@ -91,8 +89,13 @@ export default function RootLayout() {
       setUnlockPassword('');
       setUnlockError('');
     } else {
-      setUnlockError(t('loginFailed', language));
+      setUnlockError(language === 'zh' ? '主密码错误，请重新输入' : 'Incorrect master password');
     }
+  };
+
+  const handleSwitchAccount = async () => {
+    await logout();
+    router.replace('/login');
   };
 
   const isAuthRoute = pathname === '/login' || pathname === '/register';
@@ -106,7 +109,7 @@ export default function RootLayout() {
             // @ts-ignore
             onPointerDown={touchActive}
           >
-            {/* Vault Locked Screen Overlay */}
+            {/* Vault Locked Screen Overlay (Shows current user account and stays locked on refresh) */}
             {isLocked && !isAuthRoute ? (
               <View style={[styles.lockedOverlay, { backgroundColor: palette.background }]}>
                 <View
@@ -121,12 +124,40 @@ export default function RootLayout() {
                   <View style={[styles.lockIconBox, { backgroundColor: palette.primaryContainer }]}>
                     <Icon name="lock" size={32} color="#ffffff" fill />
                   </View>
+
                   <Text style={[styles.lockedTitle, { color: palette.onSurface }]}>
                     {t('vaultSecure', language)}
                   </Text>
-                  <Text style={[styles.lockedSubtitle, { color: palette.onSurfaceVariant }]}>
-                    {t('welcomeBack', language)}
-                  </Text>
+
+                  {/* Current Locked Account Info */}
+                  {user && (
+                    <View
+                      style={[
+                        styles.userInfoBox,
+                        {
+                          backgroundColor: palette.surfaceContainerLow,
+                          borderColor: palette.outlineVariant,
+                        },
+                      ]}
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            user.avatarUrl ||
+                            `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(user.email || 'user')}`,
+                        }}
+                        style={styles.userAvatar}
+                      />
+                      <View style={styles.userTextGroup}>
+                        <Text style={[styles.userName, { color: palette.onSurface }]}>
+                          {user.name}
+                        </Text>
+                        <Text style={[styles.userEmail, { color: palette.onSurfaceVariant }]}>
+                          {user.email}
+                        </Text>
+                      </View>
+                    </View>
+                  )}
 
                   <View style={styles.unlockForm}>
                     <View
@@ -150,6 +181,7 @@ export default function RootLayout() {
                           setUnlockError('');
                         }}
                         onSubmitEditing={handleUnlock}
+                        autoFocus
                       />
                       <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                         <Icon
@@ -173,6 +205,13 @@ export default function RootLayout() {
                     >
                       <Icon name="lock_open" size={18} color="#ffffff" />
                       <Text style={styles.unlockButtonText}>{t('navUnlockVault', language)}</Text>
+                    </TouchableOpacity>
+
+                    {/* Switch Account Option */}
+                    <TouchableOpacity onPress={handleSwitchAccount} style={styles.switchAccountBtn}>
+                      <Text style={[styles.switchAccountText, { color: palette.primary }]}>
+                        {language === 'zh' ? '切换账号 / 退出登录' : 'Switch Account / Log Out'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -201,7 +240,7 @@ const styles = StyleSheet.create({
   },
   lockedCard: {
     width: '100%',
-    maxWidth: 380,
+    maxWidth: 400,
     padding: 28,
     borderRadius: 24,
     borderWidth: 1,
@@ -213,12 +252,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   lockIconBox: {
-    width: 64,
-    height: 64,
+    width: 60,
+    height: 60,
     borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   lockedTitle: {
     fontFamily: 'Inter, system-ui, sans-serif',
@@ -226,12 +265,34 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-  lockedSubtitle: {
-    fontFamily: 'Inter, system-ui, sans-serif',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 6,
+  userInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    width: '100%',
+    marginTop: 16,
     marginBottom: 20,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 9999,
+  },
+  userTextGroup: {
+    flex: 1,
+  },
+  userName: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  userEmail: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 12,
   },
   unlockForm: {
     width: '100%',
@@ -265,7 +326,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 9999,
-    marginTop: 6,
+    marginTop: 4,
     cursor: 'pointer',
   },
   unlockButtonText: {
@@ -273,5 +334,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 15,
     fontWeight: '700',
+  },
+  switchAccountBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginTop: 4,
+    cursor: 'pointer',
+  },
+  switchAccountText: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

@@ -57,11 +57,12 @@ export const FortressSidebar: React.FC<FortressSidebarProps> = ({ onOpenAddModal
           <Text style={[styles.userEmail, { color: palette.onSurfaceVariant }]} numberOfLines={1}>
             {user?.email || 'secure@vault.local'}
           </Text>
-          <View style={[styles.securityBadge, { backgroundColor: palette.secondaryContainer }]}>
+          {/* Security level badge commented out per requirement */}
+          {/* <View style={[styles.securityBadge, { backgroundColor: palette.secondaryContainer }]}>
             <Text style={[styles.securityBadgeText, { color: palette.onSecondaryContainer }]}>
               {t('securityLevel', language)}
             </Text>
-          </View>
+          </View> */}
         </View>
       </View>
 
@@ -116,7 +117,9 @@ export const FortressSidebar: React.FC<FortressSidebarProps> = ({ onOpenAddModal
             style={[styles.addAccountButton, { backgroundColor: palette.primary }]}
           >
             <Icon name="add" size={22} color="#ffffff" />
-            <Text style={styles.addAccountButtonText}>{t('navAddAccount', language)}</Text>
+            <Text style={styles.addAccountButtonText}>
+              {language === 'zh' ? '新增密钥' : 'Add 2FA Key'}
+            </Text>
           </TouchableOpacity>
         )}
 

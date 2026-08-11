@@ -1,19 +1,26 @@
 export type OTPAlgorithm = 'SHA1' | 'SHA256' | 'SHA512';
 
+export interface CustomField {
+  id: string;
+  key: string;
+  value: string;
+}
+
 export interface Token {
   id: string;
   userId: string;
-  categoryId: string; // e.g. 'all', 'work', 'finance', 'social', or custom category id
+  categoryId: string;
   issuer: string;
   accountName: string;
   secretKey: string;
   algorithm: OTPAlgorithm;
-  digits: number; // 6 or 8
-  period: number; // usually 30s
-  iconType?: string; // e.g. 'security', 'account_balance', 'code', 'language', 'hub', 'cloud'
+  digits: number;
+  period: number;
+  iconType?: string;
   iconUrl?: string;
   backupCodes: string[];
   notes?: string;
+  customFields?: CustomField[];
   isFavorite?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -30,4 +37,5 @@ export interface NewTokenInput {
   iconType?: string;
   notes?: string;
   backupCodes?: string[];
+  customFields?: CustomField[];
 }
