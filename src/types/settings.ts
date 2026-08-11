@@ -26,6 +26,7 @@ export interface AppSettings {
   autoLockMinutes: number; // 0 = never, 1, 5, 15, 30
   biometricsEnabled: boolean;
   cloudSyncEnabled: boolean;
+  persistSessionOnReload: boolean; // Keep logged in on page refresh / restart
   hideCodesByDefault: boolean;
   hapticsEnabled: boolean;
 }

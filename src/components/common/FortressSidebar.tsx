@@ -27,6 +27,7 @@ export const FortressSidebar: React.FC<FortressSidebarProps> = ({ onOpenAddModal
   const navItems = [
     { label: t('navHome', language), path: '/', icon: 'home' },
     { label: t('navCategories', language), path: '/categories', icon: 'folder' },
+    { label: language === 'zh' ? '提供商' : 'Providers', path: '/providers', icon: 'hub' },
     { label: t('navSettings', language), path: '/settings', icon: 'settings' },
   ];
 

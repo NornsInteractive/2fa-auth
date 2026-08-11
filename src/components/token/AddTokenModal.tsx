@@ -4,7 +4,7 @@ import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useAddTokenMutation } from '../../api/hooks';
 import { getColorPalette } from '../../theme/colors';
-import { generateBackupCodes, generateRandomSecret, parseOtpAuthUri } from '../../utils/totp';
+import { parseOtpAuthUri } from '../../utils/totp';
 import { useToast } from '../common/Toast';
 import { t } from '../../utils/i18n';
 import { Icon } from '../common/Icon';
@@ -64,19 +64,6 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
     }
   };
 
-  const handleGenerateTestKey = () => {
-    const key = generateRandomSecret(20);
-    setSecretKey(key);
-    if (!issuer) setIssuer('Google');
-    if (!accountName) setAccountName('user@domain.com');
-    setErrorMessage('');
-  };
-
-  const handleGenerateBackupCodes = () => {
-    const codes = generateBackupCodes(10);
-    setBackupCodesText(codes.join('\n'));
-  };
-
   const handleAddCustomField = () => {
     const newField: CustomField = {
       id: `cf_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
@@ -111,7 +98,7 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
       return;
     }
 
-    // Parse backup codes
+    // Parse backup codes (one per line or separated by space)
     const backupCodes = backupCodesText
       .split(/[\n, ]+/)
       .map((s) => s.trim())
@@ -263,18 +250,11 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
               />
             </View>
 
-            {/* Secret Key with Test Generator */}
+            {/* Secret Key */}
             <View style={styles.formGroup}>
-              <View style={styles.labelRow}>
-                <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
-                  {t('secretKeyLabel', language)} *
-                </Text>
-                <TouchableOpacity onPress={handleGenerateTestKey}>
-                  <Text style={[styles.helperAction, { color: palette.primary }]}>
-                    {t('generateDemoKey', language)}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
+                {t('secretKeyLabel', language)} *
+              </Text>
               <TextInput
                 style={[
                   styles.input,
@@ -328,18 +308,11 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
                 {language === 'zh' ? '附加安全信息 (非必填)' : 'Additional Security Info (Optional)'}
               </Text>
 
-              {/* Backup Codes */}
+              {/* Backup Codes (Multi-line text area to store provider backup codes for copy) */}
               <View style={styles.formGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
-                    {language === 'zh' ? '备份恢复码 (Recovery Codes)' : 'Backup Recovery Codes'}
-                  </Text>
-                  <TouchableOpacity onPress={handleGenerateBackupCodes}>
-                    <Text style={[styles.helperAction, { color: palette.primary }]}>
-                      {language === 'zh' ? '自动生成10组' : 'Generate 10 Codes'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={[styles.label, { color: palette.onSurfaceVariant }]}>
+                  {language === 'zh' ? '提供商备份恢复码 (Recovery Codes)' : 'Provider Backup Recovery Codes'}
+                </Text>
                 <TextInput
                   style={[
                     styles.textArea,
@@ -350,7 +323,11 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
                       color: palette.onSurface,
                     },
                   ]}
-                  placeholder={language === 'zh' ? '每行输入一个恢复码，或空格隔开' : 'Enter recovery codes (one per line)...'}
+                  placeholder={
+                    language === 'zh'
+                      ? '输入或粘贴提供商给您的备份恢复码（每行一个），以供后续快速复制使用...'
+                      : 'Paste provider backup recovery codes here (one per line)...'
+                  }
                   placeholderTextColor={palette.outline}
                   value={backupCodesText}
                   onChangeText={setBackupCodesText}

@@ -9,6 +9,7 @@ interface SettingsState extends AppSettings {
   setAutoLockMinutes: (mins: number) => void;
   setBiometricsEnabled: (enabled: boolean) => void;
   setCloudSyncEnabled: (enabled: boolean) => void;
+  setPersistSessionOnReload: (enabled: boolean) => void;
   loadSettings: () => Promise<void>;
 }
 
@@ -21,6 +22,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   autoLockMinutes: 5,
   biometricsEnabled: true,
   cloudSyncEnabled: true,
+  persistSessionOnReload: true,
   hideCodesByDefault: false,
   hapticsEnabled: true,
 
@@ -52,6 +54,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setCloudSyncEnabled: (cloudSyncEnabled) => {
     set({ cloudSyncEnabled });
     storage.set(SETTINGS_STORAGE_KEY, { ...get(), cloudSyncEnabled });
+  },
+
+  setPersistSessionOnReload: (persistSessionOnReload) => {
+    set({ persistSessionOnReload });
+    storage.set(SETTINGS_STORAGE_KEY, { ...get(), persistSessionOnReload });
   },
 
   loadSettings: async () => {

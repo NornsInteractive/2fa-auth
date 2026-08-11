@@ -5,6 +5,7 @@ import { storage } from '../utils/storage';
 import { useTokenStore } from './useTokenStore';
 import { useCategoryStore } from './useCategoryStore';
 import { useProviderStore } from './useProviderStore';
+import { useSettingsStore } from './useSettingsStore';
 
 export interface StoredAccount {
   id: string;
@@ -20,6 +21,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLocked: boolean;
+  isAuthReady: boolean;
   masterPasswordHash: string | null;
   lastActiveTimestamp: number;
   register: (name: string, email: string, masterPassword: string) => Promise<{ success: boolean; error?: string }>;
@@ -41,6 +43,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLocked: false,
+  isAuthReady: false,
   masterPasswordHash: null,
   lastActiveTimestamp: Date.now(),
 
@@ -103,6 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user,
         isAuthenticated: true,
         isLocked: false,
+        isAuthReady: true,
         masterPasswordHash: pwdHash,
         lastActiveTimestamp: Date.now(),
       });
@@ -181,6 +185,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user,
         isAuthenticated: true,
         isLocked: false,
+        isAuthReady: true,
         masterPasswordHash: inputHash,
         lastActiveTimestamp: Date.now(),
       });
@@ -230,6 +235,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user: null,
       isAuthenticated: false,
       isLocked: false,
+      isAuthReady: true,
       masterPasswordHash: null,
     });
     await storage.remove(SESSION_STORAGE_KEY);
@@ -247,6 +253,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loadAuth: async () => {
+    // Ensure settings are loaded first to know persistSessionOnReload preference
+    await useSettingsStore.getState().loadSettings();
+    const persistEnabled = useSettingsStore.getState().persistSessionOnReload;
+
+    if (!persistEnabled) {
+      // User opted to log out upon page reload
+      await storage.remove(SESSION_STORAGE_KEY);
+      await storage.remove(VAULT_LOCK_STORAGE_KEY);
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLocked: false,
+        isAuthReady: true,
+        masterPasswordHash: null,
+      });
+      useTokenStore.setState({ tokens: [] });
+      return;
+    }
+
     const savedUser = await storage.get<User | null>(SESSION_STORAGE_KEY, null);
     const savedLock = await storage.get<boolean>(VAULT_LOCK_STORAGE_KEY, false);
 
@@ -258,6 +283,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: savedUser,
         isAuthenticated: true,
         isLocked: savedLock,
+        isAuthReady: true,
         masterPasswordHash: account ? account.passwordHash : null,
       });
 
@@ -269,6 +295,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         user: null,
         isAuthenticated: false,
         isLocked: false,
+        isAuthReady: true,
         masterPasswordHash: null,
       });
       useTokenStore.setState({ tokens: [] });

@@ -170,11 +170,13 @@ export const TokenCard: React.FC<TokenCardProps> = ({ token, remainingSeconds, o
           <ProgressRing
             remainingSeconds={remainingSeconds}
             period={token.period || 30}
-            size={32}
-            strokeWidth={3.5}
+            size={36}
+            strokeWidth={4}
+            showText={true}
             primaryColor={palette.primary}
             errorColor={palette.error}
             trackColor={palette.surfaceVariant}
+            textColor={palette.onSurface}
           />
 
           <View

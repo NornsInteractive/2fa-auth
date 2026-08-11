@@ -37,6 +37,8 @@ export default function SettingsScreen() {
   const setBiometricsEnabled = useSettingsStore((s) => s.setBiometricsEnabled);
   const cloudSyncEnabled = useSettingsStore((s) => s.cloudSyncEnabled);
   const setCloudSyncEnabled = useSettingsStore((s) => s.setCloudSyncEnabled);
+  const persistSessionOnReload = useSettingsStore((s) => s.persistSessionOnReload);
+  const setPersistSessionOnReload = useSettingsStore((s) => s.setPersistSessionOnReload);
 
   const [clearModalVisible, setClearModalVisible] = useState(false);
 
@@ -318,6 +320,31 @@ export default function SettingsScreen() {
                     )
                   }
                   thumbColor={'#ccc'}
+                  trackColor={{ false: '#767577', true: palette.secondaryContainer }}
+                />
+              </View>
+
+              {/* Persist Session on Reload Toggle */}
+              <View
+                style={[
+                  styles.cardRow,
+                  { backgroundColor: palette.surfaceContainer, borderColor: palette.outlineVariant },
+                ]}
+              >
+                <View style={styles.rowInfo}>
+                  <Text style={[styles.rowTitle, { color: palette.onSurface }]}>
+                    {language === 'zh' ? '刷新页面保持登录' : 'Keep Logged In on Refresh'}
+                  </Text>
+                  <Text style={[styles.rowSub, { color: palette.onSurfaceVariant }]}>
+                    {language === 'zh'
+                      ? '开启后刷新或重启页面无需重新输入主密码'
+                      : 'Preserve vault session across page reloads and browser restarts'}
+                  </Text>
+                </View>
+                <Switch
+                  value={persistSessionOnReload}
+                  onValueChange={setPersistSessionOnReload}
+                  thumbColor={persistSessionOnReload ? palette.primary : '#ccc'}
                   trackColor={{ false: '#767577', true: palette.secondaryContainer }}
                 />
               </View>

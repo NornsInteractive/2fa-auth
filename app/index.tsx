@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { useTokenStore } from '../src/store/useTokenStore';
@@ -25,6 +25,7 @@ export default function HomeScreen() {
 
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isAuthReady = useAuthStore((s) => s.isAuthReady);
 
   const tokens = useTokenStore((s) => s.tokens);
   const searchQuery = useTokenStore((s) => s.searchQuery);
@@ -44,12 +45,12 @@ export default function HomeScreen() {
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedDetailToken, setSelectedDetailToken] = useState<Token | null>(null);
 
-  // Check auth and redirect if not logged in
+  // Check auth and redirect only once auth status has loaded
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (isAuthReady && (!isAuthenticated || !user)) {
       router.replace('/login');
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthReady, isAuthenticated, user]);
 
   // Filtered tokens by Category, Provider/Issuer, and Search Query
   const filteredTokens = useMemo(() => {
@@ -82,8 +83,12 @@ export default function HomeScreen() {
     setDetailModalVisible(true);
   };
 
-  if (!isAuthenticated || !user) {
-    return null;
+  if (!isAuthReady || !isAuthenticated || !user) {
+    return (
+      <View style={[styles.loadingScreen, { backgroundColor: palette.background }]}>
+        <ActivityIndicator size="large" color={palette.primary} />
+      </View>
+    );
   }
 
   return (
@@ -236,6 +241,13 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    height: '100%',
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   screenContainer: {
     flex: 1,
     height: '100%',
