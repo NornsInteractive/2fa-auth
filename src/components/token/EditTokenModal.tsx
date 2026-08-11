@@ -75,10 +75,7 @@ export const EditTokenModal: React.FC<EditTokenModalProps> = ({ visible, token, 
   const handleSave = async () => {
     if (!issuer.trim() || !accountName.trim()) return;
 
-    const backupCodes = backupCodesText
-      .split(/[\n, ]+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    const backupCodes = backupCodesText.trim() ? [backupCodesText.trim()] : [];
 
     const validCustomFields = customFields.filter((f) => f.key.trim() && f.value.trim());
 

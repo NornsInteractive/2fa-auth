@@ -51,7 +51,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
       digits: input.digits || 6,
       period: input.period || 30,
       iconType: input.iconType || 'shield',
-      backupCodes: input.backupCodes && input.backupCodes.length > 0 ? input.backupCodes : generateBackupCodes(10),
+      backupCodes: input.backupCodes && input.backupCodes.length > 0 ? input.backupCodes : [],
       notes: input.notes || '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

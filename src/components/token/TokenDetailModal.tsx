@@ -62,6 +62,15 @@ export const TokenDetailModal: React.FC<TokenDetailModalProps> = ({ visible, tok
     showToast(t('copiedSecret', language), 'key');
   };
 
+  const handleCopyBackupCode = () => {
+    const text = Array.isArray(token.backupCodes) ? token.backupCodes.join('\n') : (token.backupCodes || '');
+    if (!text) return;
+    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    showToast(t('copiedBackupCodes', language), 'restore_page');
+  };
+
   const handleDelete = async () => {
     await deleteToken(token.id);
     setDeleteConfirmVisible(false);
@@ -195,11 +204,9 @@ export const TokenDetailModal: React.FC<TokenDetailModalProps> = ({ visible, tok
               </View>
             </View>
 
-            {/* Backup Codes Row */}
+            {/* Backup Recovery Code Row (One-Click Copy) */}
             {token.backupCodes && token.backupCodes.length > 0 && (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setBackupModalVisible(true)}
+              <View
                 style={[
                   styles.detailRow,
                   {
@@ -212,12 +219,28 @@ export const TokenDetailModal: React.FC<TokenDetailModalProps> = ({ visible, tok
                   <Text style={[styles.detailLabel, { color: palette.onSurfaceVariant }]}>
                     {t('copyBackupCodes', language)}
                   </Text>
-                  <Text style={[styles.detailSub, { color: palette.onSurface }]}>
-                    {token.backupCodes.length} {t('remainingBackupCodes', language)}
+                  <Text
+                    style={[styles.secretText, { color: palette.onSurface }]}
+                    numberOfLines={2}
+                  >
+                    {token.backupCodes.join('\n')}
                   </Text>
                 </View>
-                <Icon name="chevron_right" size={20} color={palette.onSurfaceVariant} />
-              </TouchableOpacity>
+                <View style={styles.detailActions}>
+                  <TouchableOpacity
+                    onPress={() => setBackupModalVisible(true)}
+                    style={[styles.smallActionBtn, { backgroundColor: palette.surface }]}
+                  >
+                    <Icon name="visibility" size={16} color={palette.onSurfaceVariant} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={handleCopyBackupCode}
+                    style={[styles.smallActionBtn, { backgroundColor: palette.surface }]}
+                  >
+                    <Icon name="content_copy" size={16} color={palette.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
             )}
 
             {/* Notes Section */}

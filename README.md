@@ -1,6 +1,6 @@
-# Fortress Authenticator (2FA Auth)
+# Mimir (2FA Auth)
 
-A high-security, Material Design 3 Two-Factor Authentication (2FA) & Digital Vault application. Built with **React Native (Expo + Expo Router)**, **Tamagui**, **Zustand**, **TanStack Query**, and deployed to **Cloudflare Workers & Cloudflare D1**.
+A state-of-the-art, secure, and responsive 2FA Authenticator built with React Native (Expo Router + Tamagui), Zustand, TanStack Query, and Cloudflare Workers + D1.
 
 ---
 

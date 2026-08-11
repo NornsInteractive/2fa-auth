@@ -98,11 +98,8 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
       return;
     }
 
-    // Parse backup codes (one per line or separated by space)
-    const backupCodes = backupCodesText
-      .split(/[\n, ]+/)
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0);
+    // Store backup codes as a single unified text block
+    const backupCodes = backupCodesText.trim() ? [backupCodesText.trim()] : [];
 
     const validCustomFields = customFields.filter((f) => f.key.trim() && f.value.trim());
 

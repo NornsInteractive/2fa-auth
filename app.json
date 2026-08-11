@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Fortress Authenticator",
-    "slug": "fortress-authenticator-2fa",
+    "name": "Mimir",
+    "slug": "mimir-2fa-auth",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
-    "scheme": "fortressauth",
+    "scheme": "mimirauth",
     "newArchEnabled": true,
     "splash": {
       "resizeMode": "contain",
@@ -23,7 +23,9 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Mimir",
+      "shortName": "Mimir"
     },
     "plugins": [
       "expo-router"

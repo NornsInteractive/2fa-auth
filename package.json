@@ -1,5 +1,5 @@
 {
-  "name": "fortress-authenticator-2fa",
+  "name": "mimir-authenticator-2fa",
   "version": "1.0.0",
   "main": "expo-router/entry",
   "scripts": {
