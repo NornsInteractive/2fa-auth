@@ -1,4 +1,4 @@
-name = "fortress-authenticator-worker"
+name = "2fa-auth"
 main = "src/worker/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
@@ -6,12 +6,6 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-
-[[d1_databases]]
-binding = "DB"
-database_name = "fortress-2fa-db"
-database_id = "local-fortress-d1"
-migrations_dir = "migrations"
 
 [vars]
 ENVIRONMENT = "production"
