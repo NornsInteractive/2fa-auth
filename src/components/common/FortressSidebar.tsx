@@ -46,16 +46,16 @@ export const FortressSidebar: React.FC<FortressSidebarProps> = ({ onOpenAddModal
           source={{
             uri:
               user?.avatarUrl ||
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuBP18h7lMt9Jz969VwHvr9kclC06hg8li0TjxKYjcpul_kGLszoJ7cCmriJbv9PqG1OxLDoBxAYa6ucWPASZFp4GGnZDkPz0oU2ynba_0pHFf6eSGfBwCr0VeHDA6gW20ltCNnxT2fkSPfrynp9N-4rZW8teEGZfKsItOCRlENr3pztp-jUjC4NNEGuYayvWG6uEn0QkIPhvFN9mRLySFK6eSue8PeTf93kuSan-tjXeYXqOFPmbaNU',
+              `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(user?.email || 'user')}`,
           }}
           style={styles.avatar}
         />
         <View style={styles.profileInfo}>
           <Text style={[styles.userName, { color: palette.primary }]} numberOfLines={1}>
-            {user?.name || 'Alex Mercer'}
+            {user?.name || 'My Vault'}
           </Text>
           <Text style={[styles.userEmail, { color: palette.onSurfaceVariant }]} numberOfLines={1}>
-            {user?.email || 'admin@fortress.auth'}
+            {user?.email || 'secure@vault.local'}
           </Text>
           <View style={[styles.securityBadge, { backgroundColor: palette.secondaryContainer }]}>
             <Text style={[styles.securityBadgeText, { color: palette.onSecondaryContainer }]}>

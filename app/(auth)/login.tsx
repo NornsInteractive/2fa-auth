@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useSettingsStore } from '../../src/store/useSettingsStore';
@@ -21,15 +21,15 @@ export default function LoginScreen() {
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
 
-  const [email, setEmail] = useState('admin@fortress.auth');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignIn = async () => {
     if (!email.trim() || !password) {
-      setError(t('loginFailed', language));
+      setError(language === 'zh' ? '请输入邮箱与主密码' : 'Please enter email and master password');
       return;
     }
 
@@ -52,8 +52,10 @@ export default function LoginScreen() {
     const res = await biometricLogin();
     setLoading(false);
     if (res.success) {
-      showToast('生物识别验证成功！', 'fingerprint');
+      showToast(language === 'zh' ? '生物识别验证成功！' : 'Biometric authenticated', 'fingerprint');
       router.replace('/');
+    } else {
+      setError(res.error || '生物识别失败');
     }
   };
 
@@ -209,12 +211,6 @@ export default function LoginScreen() {
 
             {/* Footer Navigation */}
             <View style={styles.footerSection}>
-              <TouchableOpacity onPress={() => showToast('演示主密码已预填：123456', 'key')}>
-                <Text style={[styles.forgotLink, { color: palette.primary }]}>
-                  {t('forgotPassword', language)}
-                </Text>
-              </TouchableOpacity>
-
               <View style={styles.createAccountRow}>
                 <Text style={[styles.footerText, { color: palette.onSurfaceVariant }]}>
                   {t('newToFortress', language)}{' '}
@@ -394,10 +390,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 20,
     gap: 12,
-  },
-  forgotLink: {
-    fontFamily: 'Inter, system-ui, sans-serif',
-    fontSize: 14,
   },
   createAccountRow: {
     flexDirection: 'row',

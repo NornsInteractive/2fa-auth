@@ -110,7 +110,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
               source={{
                 uri:
                   user?.avatarUrl ||
-                  'https://lh3.googleusercontent.com/aida-public/AB6AXuDXmNpV7oLZzA1WrHiZ7ndXWAq5HdudWEhgzWG5BCiTICmvrp8tI9wm3DGmD7GZIydZuUQZwo4HNpuBth5yOUm_02bEbjQ1fRSCFwIN3_YgKLocgOXk9pLW7mSB7Lz5YCupQrp_6yhLepubyRLVjweDjad8-k014Z97W-jpqMXf_ftFDXpRoIhugmCGEw4Fd2JrytBbrpF-hQe4x_AtjeNTBbwIPlJeE1n0c6pYtCc6i2Hh8-vpsuro',
+                  `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(user?.email || 'default')}`,
               }}
               style={styles.avatarImage}
             />
@@ -118,7 +118,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
         </View>
       </View>
 
-      {/* Search Input Bar */}
+      {/* Search Input Bar + Add Token Button */}
       <View style={styles.searchBarRow}>
         <View
           style={[
@@ -144,6 +144,18 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Add Token Button next to search input */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={onOpenAddModal}
+          style={[styles.addTokenBtn, { backgroundColor: palette.primary }]}
+        >
+          <Icon name="add" size={18} color="#ffffff" />
+          <Text style={styles.addTokenBtnText}>
+            {language === 'zh' ? '新增密钥' : 'Add Token'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Theme Color Picker Modal */}
@@ -290,9 +302,13 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   searchBarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
     width: '100%',
   },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
@@ -308,6 +324,26 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 14,
     paddingVertical: 2,
+  },
+  addTokenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    cursor: 'pointer',
+  },
+  addTokenBtnText: {
+    color: '#ffffff',
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 13,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,

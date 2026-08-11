@@ -5,25 +5,29 @@ import { storage } from '../utils/storage';
 
 interface CategoryState {
   categories: Category[];
+  currentUserId: string | null;
   selectedCategoryId: string;
   setSelectedCategoryId: (id: string) => void;
-  addCategory: (input: NewCategoryInput) => Promise<Category>;
+  addCategory: (input: NewCategoryInput, userId?: string) => Promise<Category>;
   updateCategory: (id: string, updates: Partial<NewCategoryInput>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
-  loadCategories: () => Promise<void>;
+  loadCategories: (userId?: string) => Promise<void>;
 }
 
-const CATEGORIES_STORAGE_KEY = 'fortress_categories_v1';
+const getCategoryStorageKey = (userId?: string | null) =>
+  userId ? `fortress_categories_user_${userId}` : 'fortress_categories_guest';
 
 export const useCategoryStore = create<CategoryState>((set, get) => ({
   categories: DEFAULT_CATEGORIES,
+  currentUserId: null,
   selectedCategoryId: 'all',
 
   setSelectedCategoryId: (id: string) => {
     set({ selectedCategoryId: id });
   },
 
-  addCategory: async (input: NewCategoryInput) => {
+  addCategory: async (input: NewCategoryInput, passedUserId?: string) => {
+    const userId = passedUserId || get().currentUserId || 'user_default';
     const newCategory: Category = {
       id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: input.name,
@@ -35,11 +39,22 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
     const next = [...get().categories, newCategory];
     set({ categories: next });
-    await storage.set(CATEGORIES_STORAGE_KEY, next);
+    await storage.set(getCategoryStorageKey(userId), next);
+
+    // Sync remote
+    try {
+      fetch('/api/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...input, userId }),
+      }).catch(() => {});
+    } catch (_) {}
+
     return newCategory;
   },
 
   updateCategory: async (id: string, updates: Partial<NewCategoryInput>) => {
+    const userId = get().currentUserId;
     const next = get().categories.map((c) => {
       if (c.id === id) {
         return {
@@ -51,34 +66,55 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
       return c;
     });
     set({ categories: next });
-    await storage.set(CATEGORIES_STORAGE_KEY, next);
+    await storage.set(getCategoryStorageKey(userId), next);
   },
 
   deleteCategory: async (id: string) => {
-    // Cannot delete 'all' default category
     if (id === 'all') return;
+    const userId = get().currentUserId;
     const next = get().categories.filter((c) => c.id !== id);
     let nextSelected = get().selectedCategoryId;
     if (nextSelected === id) {
       nextSelected = 'all';
     }
     set({ categories: next, selectedCategoryId: nextSelected });
-    await storage.set(CATEGORIES_STORAGE_KEY, next);
+    await storage.set(getCategoryStorageKey(userId), next);
+
+    try {
+      fetch(`/api/categories/${id}?userId=${userId}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+    } catch (_) {}
   },
 
-  loadCategories: async () => {
-    const saved = await storage.get<Category[]>(CATEGORIES_STORAGE_KEY, []);
+  loadCategories: async (userId?: string) => {
+    const activeUserId = userId || get().currentUserId;
+    set({ currentUserId: activeUserId || null });
+
+    const storageKey = getCategoryStorageKey(activeUserId);
+    let saved = await storage.get<Category[]>(storageKey, []);
+
+    // Try fetch remote
+    if (activeUserId) {
+      try {
+        const res = await fetch(`/api/categories?userId=${activeUserId}`);
+        if (res.ok) {
+          const remoteCats = await res.json();
+          if (Array.isArray(remoteCats) && remoteCats.length > 0) {
+            saved = remoteCats;
+          }
+        }
+      } catch (_) {}
+    }
+
     if (saved && saved.length > 0) {
-      // Merge with default categories ensuring 'all' is always present
       const hasAll = saved.some((c) => c.id === 'all');
-      if (!hasAll) {
-        set({ categories: [DEFAULT_CATEGORIES[0], ...saved] });
-      } else {
-        set({ categories: saved });
-      }
+      const merged = hasAll ? saved : [DEFAULT_CATEGORIES[0], ...saved];
+      set({ categories: merged });
+      await storage.set(storageKey, merged);
     } else {
       set({ categories: DEFAULT_CATEGORIES });
-      await storage.set(CATEGORIES_STORAGE_KEY, DEFAULT_CATEGORIES);
+      await storage.set(storageKey, DEFAULT_CATEGORIES);
     }
   },
 }));

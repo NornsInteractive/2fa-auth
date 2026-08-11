@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuthStore } from '../src/store/useAuthStore';
 import { useTokenStore } from '../src/store/useTokenStore';
 import { useCategoryStore } from '../src/store/useCategoryStore';
 import { useSettingsStore } from '../src/store/useSettingsStore';
@@ -20,8 +21,12 @@ export default function HomeScreen() {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 840;
 
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
   const tokens = useTokenStore((s) => s.tokens);
   const searchQuery = useTokenStore((s) => s.searchQuery);
+  const selectedProvider = useTokenStore((s) => s.selectedProvider);
   const remainingSeconds = useTokenStore((s) => s.remainingSeconds);
   const selectedCategoryId = useCategoryStore((s) => s.selectedCategoryId);
 
@@ -35,11 +40,25 @@ export default function HomeScreen() {
   const [addTokenVisible, setAddTokenVisible] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
 
-  // Filtered tokens
+  // Check auth and redirect if not logged in
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      router.replace('/login');
+    }
+  }, [isAuthenticated, user]);
+
+  // Filtered tokens by Category, Provider/Issuer, and Search Query
   const filteredTokens = useMemo(() => {
     return tokens.filter((tok) => {
       // Category filter
       if (selectedCategoryId !== 'all' && tok.categoryId !== selectedCategoryId) {
+        return false;
+      }
+      // Provider / Issuer filter
+      if (
+        selectedProvider !== 'all' &&
+        tok.issuer.toLowerCase().trim() !== selectedProvider.toLowerCase().trim()
+      ) {
         return false;
       }
       // Search filter
@@ -52,7 +71,11 @@ export default function HomeScreen() {
       }
       return true;
     });
-  }, [tokens, selectedCategoryId, searchQuery]);
+  }, [tokens, selectedCategoryId, selectedProvider, searchQuery]);
+
+  if (!isAuthenticated || !user) {
+    return null;
+  }
 
   return (
     <View style={[styles.screenContainer, { backgroundColor: palette.background }]}>
@@ -64,7 +87,7 @@ export default function HomeScreen() {
 
         {/* Main Content Area */}
         <View style={styles.mainContentWrapper}>
-          {/* Header */}
+          {/* Header with Search and Add Token Button */}
           <FortressHeader onOpenAddModal={() => setAddTokenVisible(true)} />
 
           <ScrollView
@@ -72,7 +95,7 @@ export default function HomeScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Category Filter Chips */}
+            {/* Category & Provider Filter Chips */}
             <CategoryChips onOpenAddCategory={() => setAddCategoryVisible(true)} />
 
             {/* Token Cards Grid */}
@@ -117,7 +140,7 @@ export default function HomeScreen() {
                 )}
               </View>
             ) : (
-              /* Empty State */
+              /* Empty State (Clean zero mock data) */
               <View style={styles.emptyContainer}>
                 <TouchableOpacity
                   activeOpacity={0.8}
@@ -140,10 +163,12 @@ export default function HomeScreen() {
                     <Icon name="add" size={32} color={palette.onSecondaryContainer} />
                   </View>
                   <Text style={[styles.addPlaceholderTitle, { color: palette.onSurface }]}>
-                    {t('addNewAccountCard', language)}
+                    {language === 'zh' ? '暂无 2FA 密钥' : 'No 2FA Tokens Yet'}
                   </Text>
                   <Text style={[styles.addPlaceholderSub, { color: palette.onSurfaceVariant }]}>
-                    {t('scanOrEnterKey', language)}
+                    {language === 'zh'
+                      ? '点击此处或顶部“新增密钥”按钮，添加您的第一个两步验证账号'
+                      : 'Click here or top "+ Add Token" button to create your first 2FA secret key'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -269,6 +294,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     textAlign: 'center',
+    lineHeight: 18,
   },
   fab: {
     position: 'absolute',
