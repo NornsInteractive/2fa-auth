@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, ScrollView, Platform, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -7,6 +7,7 @@ import { useTokenStore } from '../../store/useTokenStore';
 import { getColorPalette, THEME_COLOR_OPTIONS } from '../../theme/colors';
 import { t } from '../../utils/i18n';
 import { Icon } from './Icon';
+import { GitHubIcon } from './GitHubIcon';
 
 interface FortressHeaderProps {
   onOpenAddModal?: () => void;
@@ -88,6 +89,23 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
             <Text style={[styles.langText, { color: palette.primary }]}>
               {language === 'zh' ? 'EN' : '中'}
             </Text>
+          </TouchableOpacity>
+
+          {/* GitHub Link */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => {
+              const url = 'https://github.com/NornsInteractive/2fa-auth';
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.open(url, '_blank');
+              } else {
+                Linking.openURL(url);
+              }
+            }}
+            style={[styles.iconButton, { backgroundColor: palette.surfaceContainerLow }]}
+            accessibilityLabel="GitHub Repository"
+          >
+            <GitHubIcon size={18} color={palette.onSurfaceVariant} />
           </TouchableOpacity>
 
           {/* Lock Vault Button */}

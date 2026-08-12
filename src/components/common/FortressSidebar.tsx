@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Platform, Linking } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { getColorPalette } from '../../theme/colors';
 import { t } from '../../utils/i18n';
 import { Icon } from './Icon';
+import { GitHubIcon } from './GitHubIcon';
 
 interface FortressSidebarProps {
   onOpenAddModal?: () => void;
@@ -134,6 +135,24 @@ export const FortressSidebar: React.FC<FortressSidebarProps> = ({ onOpenAddModal
             {t('navLockVault', language)}
           </Text>
         </TouchableOpacity>
+
+        {/* GitHub Link */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            const url = 'https://github.com/NornsInteractive/2fa-auth';
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.open(url, '_blank');
+            } else {
+              Linking.openURL(url);
+            }
+          }}
+          style={[styles.githubButton, { backgroundColor: palette.surfaceContainerLow }]}
+          accessibilityLabel="GitHub Repository"
+        >
+          <GitHubIcon size={16} color={palette.onSurfaceVariant} />
+          <Text style={[styles.lockVaultText, { color: palette.onSurfaceVariant }]}>GitHub</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -241,5 +260,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 13,
     fontWeight: '500',
+  },
+  githubButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    borderRadius: 10,
+    cursor: 'pointer',
   },
 });
