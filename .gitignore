@@ -5,3 +5,7 @@ npm-debug.*
 *.log
 .DS_Store
 worker-configuration.d.ts
+
+android/
+ios/
+
