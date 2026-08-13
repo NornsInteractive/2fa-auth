@@ -7,6 +7,8 @@ import { useCategoryStore } from './useCategoryStore';
 import { useProviderStore } from './useProviderStore';
 import { useSettingsStore } from './useSettingsStore';
 
+import { getApiUrl } from '../api/client';
+
 export interface StoredAccount {
   id: string;
   name: string;
@@ -84,7 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Try sync to Cloudflare Workers if online
       try {
-        fetch('/api/auth/register', {
+        fetch(getApiUrl('/api/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: cleanName, email: cleanEmail, password: masterPassword }),
@@ -139,7 +141,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Try remote login if not found in local registry
       if (!targetAccount) {
         try {
-          const res = await fetch('/api/auth/login', {
+          const res = await fetch(getApiUrl('/api/auth/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: cleanEmail, password: masterPassword }),

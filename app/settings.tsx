@@ -39,6 +39,7 @@ export default function SettingsScreen() {
   const setCloudSyncEnabled = useSettingsStore((s) => s.setCloudSyncEnabled);
   const persistSessionOnReload = useSettingsStore((s) => s.persistSessionOnReload);
   const setPersistSessionOnReload = useSettingsStore((s) => s.setPersistSessionOnReload);
+  const serverUrl = useSettingsStore((s) => s.serverUrl);
 
   const [clearModalVisible, setClearModalVisible] = useState(false);
 
@@ -374,6 +375,27 @@ export default function SettingsScreen() {
               <Text style={[styles.sectionHeading, { color: palette.primary }]}>
                 {t('cloudSection', language)}
               </Text>
+
+              {/* Server Endpoint URL Configuration */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/server-config')}
+                style={[
+                  styles.cardRow,
+                  styles.clickableRow,
+                  { backgroundColor: palette.surfaceContainer, borderColor: palette.outlineVariant },
+                ]}
+              >
+                <View style={styles.rowInfo}>
+                  <Text style={[styles.rowTitle, { color: palette.onSurface }]}>
+                    {language === 'zh' ? '服务端域名地址' : 'Server Endpoint URL'}
+                  </Text>
+                  <Text style={[styles.rowSub, { color: palette.onSurfaceVariant }]} numberOfLines={1}>
+                    {serverUrl || (language === 'zh' ? '未配置 (纯本地模式)' : 'Not configured (Local mode)')}
+                  </Text>
+                </View>
+                <Icon name="chevron_right" size={20} color={palette.onSurfaceVariant} />
+              </TouchableOpacity>
 
               {/* D1 Sync Status */}
               <View

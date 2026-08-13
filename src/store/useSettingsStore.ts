@@ -10,6 +10,7 @@ interface SettingsState extends AppSettings {
   setBiometricsEnabled: (enabled: boolean) => void;
   setCloudSyncEnabled: (enabled: boolean) => void;
   setPersistSessionOnReload: (enabled: boolean) => void;
+  setServerUrl: (url: string) => void;
   loadSettings: () => Promise<void>;
 }
 
@@ -25,6 +26,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   persistSessionOnReload: true,
   hideCodesByDefault: false,
   hapticsEnabled: true,
+  serverUrl: '',
+  serverConfigured: false,
 
   setLanguage: (language) => {
     set({ language });
@@ -59,6 +62,12 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setPersistSessionOnReload: (persistSessionOnReload) => {
     set({ persistSessionOnReload });
     storage.set(SETTINGS_STORAGE_KEY, { ...get(), persistSessionOnReload });
+  },
+
+  setServerUrl: (serverUrl) => {
+    const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
+    set({ serverUrl: cleanUrl, serverConfigured: true });
+    storage.set(SETTINGS_STORAGE_KEY, { ...get(), serverUrl: cleanUrl, serverConfigured: true });
   },
 
   loadSettings: async () => {

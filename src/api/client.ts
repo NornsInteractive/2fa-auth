@@ -2,6 +2,8 @@ import { QueryClient } from '@tanstack/react-query';
 import { Token, NewTokenInput } from '../types/token';
 import { Category, NewCategoryInput } from '../types/category';
 
+import { useSettingsStore } from '../store/useSettingsStore';
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -11,13 +13,21 @@ export const queryClient = new QueryClient({
   },
 });
 
-const API_BASE = '/api';
+export function getApiUrl(path: string): string {
+  const customServer = useSettingsStore.getState().serverUrl;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (customServer && customServer.trim().length > 0) {
+    const base = customServer.trim().replace(/\/+$/, '');
+    return cleanPath.startsWith('/api') ? `${base}${cleanPath}` : `${base}/api${cleanPath}`;
+  }
+  return cleanPath.startsWith('/api') ? cleanPath : `/api${cleanPath}`;
+}
 
 export const api = {
   // Tokens
   async getTokens(): Promise<Token[]> {
     try {
-      const res = await fetch(`${API_BASE}/tokens`);
+      const res = await fetch(getApiUrl('/api/tokens'));
       if (!res.ok) throw new Error('Network response was not ok');
       return await res.json();
     } catch {
@@ -28,7 +38,7 @@ export const api = {
 
   async createToken(input: NewTokenInput): Promise<Token> {
     try {
-      const res = await fetch(`${API_BASE}/tokens`, {
+      const res = await fetch(getApiUrl('/api/tokens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -42,7 +52,7 @@ export const api = {
 
   async deleteToken(id: string): Promise<void> {
     try {
-      await fetch(`${API_BASE}/tokens/${id}`, { method: 'DELETE' });
+      await fetch(getApiUrl(`/api/tokens/${id}`), { method: 'DELETE' });
     } catch {
       // offline
     }
@@ -51,7 +61,7 @@ export const api = {
   // Categories
   async getCategories(): Promise<Category[]> {
     try {
-      const res = await fetch(`${API_BASE}/categories`);
+      const res = await fetch(getApiUrl('/api/categories'));
       if (!res.ok) throw new Error('Network response was not ok');
       return await res.json();
     } catch {
@@ -61,7 +71,7 @@ export const api = {
 
   async createCategory(input: NewCategoryInput): Promise<Category> {
     try {
-      const res = await fetch(`${API_BASE}/categories`, {
+      const res = await fetch(getApiUrl('/api/categories'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

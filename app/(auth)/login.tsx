@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
@@ -17,6 +17,8 @@ export default function LoginScreen() {
   const themeMode = useSettingsStore((s) => s.themeMode);
   const themeColor = useSettingsStore((s) => s.themeColor);
   const language = useSettingsStore((s) => s.language);
+  const serverUrl = useSettingsStore((s) => s.serverUrl);
+  const serverConfigured = useSettingsStore((s) => s.serverConfigured);
 
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
@@ -26,6 +28,13 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Check server domain setup
+  useEffect(() => {
+    if (!serverConfigured) {
+      router.replace('/server-config');
+    }
+  }, [serverConfigured]);
 
   const handleSignIn = async () => {
     if (!email.trim() || !password) {
@@ -229,6 +238,20 @@ export default function LoginScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Server Endpoint URL Quick Switch */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/server-config')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 }}
+              >
+                <Icon name="dns" size={14} color={palette.onSurfaceVariant} />
+                <Text style={[styles.footerText, { color: palette.onSurfaceVariant, fontSize: 12 }]}>
+                  {language === 'zh' ? '服务地址: ' : 'Server: '}
+                  {serverUrl ? serverUrl : (language === 'zh' ? '纯本地模式' : 'Local Mode')}
+                </Text>
+                <Icon name="edit" size={14} color={palette.primary} />
+              </TouchableOpacity>
             </View>
           </View>
         </View>

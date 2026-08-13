@@ -29,4 +29,6 @@ export interface AppSettings {
   persistSessionOnReload: boolean; // Keep logged in on page refresh / restart
   hideCodesByDefault: boolean;
   hapticsEnabled: boolean;
+  serverUrl: string; // Cloudflare Workers Server URL (e.g. https://mimir-2fa-api.workers.dev)
+  serverConfigured: boolean; // Whether the user has configured/confirmed server domain
 }
