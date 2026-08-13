@@ -407,6 +407,71 @@ app.delete('/api/tokens/:id', async (c) => {
   }
 });
 
+// Helper function to auto-initialize D1 SQLite tables if missing
+async function initDbTables(db: any) {
+  if (!db) return;
+  try {
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        email TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        security_level TEXT DEFAULT 'High',
+        avatar_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run().catch(() => {});
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS categories (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        slug TEXT NOT NULL,
+        icon TEXT DEFAULT 'folder',
+        color TEXT DEFAULT '#005ac1',
+        is_default BOOLEAN DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run().catch(() => {});
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS tokens (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        category_id TEXT,
+        issuer TEXT NOT NULL,
+        account_name TEXT NOT NULL,
+        secret_key TEXT NOT NULL,
+        algorithm TEXT DEFAULT 'SHA1',
+        digits INTEGER DEFAULT 6,
+        period INTEGER DEFAULT 30,
+        icon_type TEXT DEFAULT 'shield',
+        icon_url TEXT,
+        backup_codes TEXT,
+        notes TEXT,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run().catch(() => {});
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS providers (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        icon TEXT DEFAULT 'shield',
+        color TEXT DEFAULT '#005ac1',
+        is_default BOOLEAN DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run().catch(() => {});
+  } catch (_) {}
+}
+
 // -------------------------------------------------------------
 // Providers Endpoints
 // -------------------------------------------------------------
@@ -418,13 +483,17 @@ app.get('/api/providers', async (c) => {
       return c.json([]);
     }
 
-    const { results } = await c.env.DB.prepare(
+    await initDbTables(c.env.DB);
+
+    const queryRes = await c.env.DB.prepare(
       'SELECT * FROM providers WHERE user_id = ? ORDER BY created_at ASC'
     )
       .bind(userId)
-      .all();
+      .all()
+      .catch(() => ({ results: [] }));
 
-    const formatted = (results || []).map((row: any) => ({
+    const results = queryRes.results || [];
+    const formatted = results.map((row: any) => ({
       id: row.id,
       userId: row.user_id || row.userId,
       name: row.name,
@@ -435,7 +504,7 @@ app.get('/api/providers', async (c) => {
 
     return c.json(formatted);
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return c.json([]);
   }
 });
 
@@ -453,6 +522,7 @@ app.post('/api/providers', async (c) => {
     const color = body.color || '#005ac1';
 
     if (c.env.DB) {
+      await initDbTables(c.env.DB);
       await c.env.DB.prepare(
         'INSERT INTO providers (id, user_id, name, icon, color, is_default) VALUES (?, ?, ?, ?, ?, 0)'
       )
