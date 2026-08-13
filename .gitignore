@@ -8,4 +8,5 @@ worker-configuration.d.ts
 
 android/
 ios/
-
+*.apk
+mimir-2fa-debug.apk
