@@ -18,6 +18,13 @@ interface SettingsState extends AppSettings {
 const SETTINGS_STORAGE_KEY = 'fortress_settings_v1';
 const isWeb = Platform.OS === 'web';
 
+const getInitialWebUrl = () => {
+  if (isWeb && typeof window !== 'undefined' && window.location) {
+    return window.location.origin || `${window.location.protocol}//${window.location.host}`;
+  }
+  return '';
+};
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   language: 'zh',
   themeMode: 'light',
@@ -28,7 +35,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   persistSessionOnReload: true,
   hideCodesByDefault: false,
   hapticsEnabled: true,
-  serverUrl: '',
+  serverUrl: getInitialWebUrl(),
   serverConfigured: isWeb,
 
   setLanguage: (language) => {
@@ -74,8 +81,17 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   loadSettings: async () => {
     const saved = await storage.get<Partial<AppSettings>>(SETTINGS_STORAGE_KEY, {});
+    const webDefault = getInitialWebUrl();
     if (saved && Object.keys(saved).length > 0) {
-      set((state) => ({ ...state, ...saved }));
+      set((state) => ({
+        ...state,
+        ...saved,
+        serverUrl: saved.serverUrl || webDefault,
+      }));
+    } else {
+      if (webDefault) {
+        set({ serverUrl: webDefault });
+      }
     }
   },
 }));

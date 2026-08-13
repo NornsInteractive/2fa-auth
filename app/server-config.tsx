@@ -45,9 +45,11 @@ export default function ServerConfigScreen() {
   const [pendingUrl, setPendingUrl] = useState('');
 
   useEffect(() => {
-    const current = useSettingsStore.getState().serverUrl || '';
-    setInputUrl(current);
-    setOriginalUrl(current);
+    const current = useSettingsStore.getState().serverUrl;
+    const webDefault = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin : '';
+    const initial = current || webDefault || '';
+    setInputUrl(initial);
+    setOriginalUrl(initial);
   }, []);
 
   const validateUrl = (url: string): string | null => {
