@@ -2,8 +2,8 @@ import { create } from 'zustand';
 import { NewTokenInput, Token } from '../types/token';
 import { generateBackupCodes, getRemainingSeconds } from '../utils/totp';
 import { storage } from '../utils/storage';
-
 import { getApiUrl } from '../api/client';
+import { useAuthStore } from './useAuthStore';
 
 interface TokenState {
   tokens: Token[];
@@ -60,7 +60,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
   setCopiedTokenId: (copiedTokenId: string | null) => set({ copiedTokenId }),
 
   addToken: async (input: NewTokenInput, passedUserId?: string) => {
-    const userId = passedUserId || get().currentUserId || 'user_default';
+    const userId = passedUserId || get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const newToken: Token = {
       id: `token_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       userId,
@@ -95,7 +95,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
   },
 
   updateToken: async (id: string, updates: Partial<Token>) => {
-    const userId = get().currentUserId;
+    const userId = get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const next = get().tokens.map((t) => {
       if (t.id === id) {
         return {
@@ -121,7 +121,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
   },
 
   deleteToken: async (id: string) => {
-    const userId = get().currentUserId;
+    const userId = get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const next = get().tokens.filter((t) => t.id !== id);
     set({ tokens: next });
     await storage.set(getTokenStorageKey(userId), next);

@@ -208,10 +208,7 @@ app.get('/api/categories', async (c) => {
 app.post('/api/categories', async (c) => {
   try {
     const body = await c.req.json();
-    const userId = body.userId;
-    if (!userId) {
-      return c.json({ error: 'userId is required' }, 400);
-    }
+    const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
     const id = `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const name = body.name || 'New Category';
@@ -220,6 +217,14 @@ app.post('/api/categories', async (c) => {
     const color = body.color || '#005ac1';
 
     if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      // Auto-ensure user row exists to satisfy foreign key constraint
+      await c.env.DB.prepare(
+        'INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)'
+      )
+        .bind(userId, 'User', `${userId}@fortress.app`, 'hash_placeholder')
+        .run().catch(() => {});
+
       await c.env.DB.prepare(
         `INSERT INTO categories (id, user_id, name, slug, icon, color, is_default) VALUES (?, ?, ?, ?, ?, ?, 0)`
       )
@@ -298,24 +303,40 @@ app.get('/api/tokens', async (c) => {
 app.post('/api/tokens', async (c) => {
   try {
     const body = await c.req.json();
-    const userId = body.userId;
-    if (!userId) {
-      return c.json({ error: 'userId is required' }, 400);
-    }
+    const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
     const id = `token_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const categoryId = body.categoryId || 'all';
+    const rawCategoryId = body.categoryId || body.category_id || 'all';
     const issuer = body.issuer || 'Unknown Service';
-    const accountName = body.accountName || '';
-    const secretKey = body.secretKey || '';
+    const accountName = body.accountName || body.account_name || '';
+    const secretKey = body.secretKey || body.secret_key || '';
     const algorithm = body.algorithm || 'SHA1';
     const digits = body.digits || 6;
     const period = body.period || 30;
-    const iconType = body.iconType || 'shield';
+    const iconType = body.iconType || body.icon_type || 'shield';
     const notes = body.notes || '';
-    const backupCodes = JSON.stringify(body.backupCodes || []);
+    const backupCodes = JSON.stringify(body.backupCodes || body.backup_codes || []);
 
     if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      // Auto-ensure user row exists to satisfy foreign key constraint
+      await c.env.DB.prepare(
+        'INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)'
+      )
+        .bind(userId, 'User', `${userId}@fortress.app`, 'hash_placeholder')
+        .run().catch(() => {});
+
+      // Validate category_id foreign key constraint
+      let validCategoryId: string | null = null;
+      if (rawCategoryId && rawCategoryId !== 'all') {
+        const catCheck = await c.env.DB.prepare('SELECT id FROM categories WHERE id = ?')
+          .bind(rawCategoryId)
+          .first().catch(() => null);
+        if (catCheck) {
+          validCategoryId = rawCategoryId;
+        }
+      }
+
       await c.env.DB.prepare(
         `INSERT INTO tokens (id, user_id, category_id, issuer, account_name, secret_key, algorithm, digits, period, icon_type, notes, backup_codes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -323,7 +344,7 @@ app.post('/api/tokens', async (c) => {
         .bind(
           id,
           userId,
-          categoryId,
+          validCategoryId,
           issuer,
           accountName,
           secretKey,
@@ -341,7 +362,7 @@ app.post('/api/tokens', async (c) => {
       {
         id,
         userId,
-        categoryId,
+        categoryId: rawCategoryId,
         issuer,
         accountName,
         secretKey,
@@ -363,9 +384,20 @@ app.put('/api/tokens/:id', async (c) => {
   try {
     const id = c.req.param('id');
     const body = await c.req.json();
-    const userId = body.userId;
+    const userId = body.userId || body.user_id || c.req.query('userId');
 
     if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      let validCategoryId: string | null = null;
+      if (body.categoryId && body.categoryId !== 'all') {
+        const catCheck = await c.env.DB.prepare('SELECT id FROM categories WHERE id = ?')
+          .bind(body.categoryId)
+          .first().catch(() => null);
+        if (catCheck) {
+          validCategoryId = body.categoryId;
+        }
+      }
+
       await c.env.DB.prepare(
         `UPDATE tokens SET issuer = ?, account_name = ?, category_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
          WHERE id = ? ${userId ? 'AND user_id = ?' : ''}`
@@ -373,14 +405,13 @@ app.put('/api/tokens/:id', async (c) => {
         .bind(
           body.issuer,
           body.accountName,
-          body.categoryId,
-          body.notes || '',
+          validCategoryId,
+          body.notes,
           id,
           ...(userId ? [userId] : [])
         )
         .run();
     }
-
     return c.json({ success: true, ...body });
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
@@ -511,10 +542,7 @@ app.get('/api/providers', async (c) => {
 app.post('/api/providers', async (c) => {
   try {
     const body = await c.req.json();
-    const userId = body.userId;
-    if (!userId) {
-      return c.json({ error: 'userId is required' }, 400);
-    }
+    const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
     const id = `prov_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const name = body.name || 'New Provider';
@@ -523,6 +551,13 @@ app.post('/api/providers', async (c) => {
 
     if (c.env.DB) {
       await initDbTables(c.env.DB);
+      // Auto-ensure user row exists to satisfy foreign key constraint
+      await c.env.DB.prepare(
+        'INSERT OR IGNORE INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)'
+      )
+        .bind(userId, 'User', `${userId}@fortress.app`, 'hash_placeholder')
+        .run().catch(() => {});
+
       await c.env.DB.prepare(
         'INSERT INTO providers (id, user_id, name, icon, color, is_default) VALUES (?, ?, ?, ?, ?, 0)'
       )

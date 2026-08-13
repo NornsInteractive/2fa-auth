@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Provider, NewProviderInput } from '../types/provider';
 import { storage } from '../utils/storage';
 import { getApiUrl } from '../api/client';
+import { useAuthStore } from './useAuthStore';
 
 export const DEFAULT_PROVIDERS: Provider[] = [
   { id: 'google', name: 'Google', icon: 'language', color: '#4285F4', isDefault: true },
@@ -65,7 +66,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
   },
 
   addProvider: async (input: NewProviderInput, passedUserId?: string) => {
-    const userId = passedUserId || get().currentUserId || 'user_default';
+    const userId = passedUserId || get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const newProvider: Provider = {
       id: `prov_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: input.name.trim(),
@@ -94,7 +95,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     const target = get().providers.find((p) => p.id === id);
     if (target?.isDefault) return; // Cannot delete default providers
 
-    const userId = get().currentUserId;
+    const userId = get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const next = get().providers.filter((p) => p.id !== id);
     set({ providers: next });
     await storage.set(getProviderStorageKey(userId), next);

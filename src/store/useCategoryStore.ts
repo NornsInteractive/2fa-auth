@@ -3,6 +3,7 @@ import { Category, NewCategoryInput } from '../types/category';
 import { DEFAULT_CATEGORIES } from '../api/mockData';
 import { storage } from '../utils/storage';
 import { getApiUrl } from '../api/client';
+import { useAuthStore } from './useAuthStore';
 
 interface CategoryState {
   categories: Category[];
@@ -28,7 +29,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
 
   addCategory: async (input: NewCategoryInput, passedUserId?: string) => {
-    const userId = passedUserId || get().currentUserId || 'user_default';
+    const userId = passedUserId || get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const newCategory: Category = {
       id: `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       name: input.name,
@@ -55,7 +56,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
   },
 
   updateCategory: async (id: string, updates: Partial<NewCategoryInput>) => {
-    const userId = get().currentUserId;
+    const userId = get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const next = get().categories.map((c) => {
       if (c.id === id) {
         return {
@@ -72,7 +73,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
   deleteCategory: async (id: string) => {
     if (id === 'all') return;
-    const userId = get().currentUserId;
+    const userId = get().currentUserId || useAuthStore.getState().user?.id || 'usr_guest';
     const next = get().categories.filter((c) => c.id !== id);
     let nextSelected = get().selectedCategoryId;
     if (nextSelected === id) {
