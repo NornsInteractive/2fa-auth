@@ -10,9 +10,11 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '../src/store/useSettingsStore';
+import { useAuthStore } from '../src/store/useAuthStore';
 import { getColorPalette } from '../src/theme/colors';
 import { t } from '../src/utils/i18n';
 import { Icon } from '../src/components/common/Icon';
@@ -28,19 +30,25 @@ export default function ServerConfigScreen() {
   const serverUrl = useSettingsStore((s) => s.serverUrl);
   const setServerUrl = useSettingsStore((s) => s.setServerUrl);
 
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const logout = useAuthStore((s) => s.logout);
+
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
 
   const [inputUrl, setInputUrl] = useState(serverUrl || '');
+  const [originalUrl, setOriginalUrl] = useState(serverUrl || '');
   const [errorMsg, setErrorMsg] = useState('');
   const [testing, setTesting] = useState(false);
   const [testSuccessMsg, setTestSuccessMsg] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [pendingUrl, setPendingUrl] = useState('');
 
   useEffect(() => {
-    if (serverUrl) {
-      setInputUrl(serverUrl);
-    }
-  }, [serverUrl]);
+    const current = useSettingsStore.getState().serverUrl || '';
+    setInputUrl(current);
+    setOriginalUrl(current);
+  }, []);
 
   const validateUrl = (url: string): string | null => {
     const trimmed = url.trim();
@@ -88,11 +96,32 @@ export default function ServerConfigScreen() {
 
       if (testRes && (testRes.ok || testRes.status === 200 || testRes.status === 400 || testRes.status === 401)) {
         setTestSuccessMsg(t('serverConnSuccess', language));
-        setServerUrl(cleanUrl);
-        setTimeout(() => {
-          setTesting(false);
-          router.replace('/login');
-        }, 600);
+        setTesting(false);
+
+        const urlChanged = cleanUrl !== originalUrl;
+
+        if (!urlChanged) {
+          // Domain did NOT change
+          setServerUrl(cleanUrl);
+          if (isAuthenticated) {
+            if (router.canGoBack()) {
+              router.back();
+            } else {
+              router.replace('/settings');
+            }
+          } else {
+            router.replace('/login');
+          }
+        } else {
+          // Domain HAS changed
+          if (isAuthenticated) {
+            setPendingUrl(cleanUrl);
+            setShowConfirmModal(true);
+          } else {
+            setServerUrl(cleanUrl);
+            router.replace('/login');
+          }
+        }
       } else {
         setTesting(false);
         setErrorMsg(t('serverConnFailed', language));
@@ -107,9 +136,30 @@ export default function ServerConfigScreen() {
     }
   };
 
-  const handleUseLocalMode = () => {
-    setServerUrl('');
+  const handleConfirmChangeDomain = async () => {
+    setShowConfirmModal(false);
+    await logout(); // Clear current login session
+    setServerUrl(pendingUrl);
     router.replace('/login');
+  };
+
+  const handleUseLocalMode = async () => {
+    const urlChanged = '' !== originalUrl;
+    if (urlChanged && isAuthenticated) {
+      setPendingUrl('');
+      setShowConfirmModal(true);
+    } else {
+      setServerUrl('');
+      if (isAuthenticated) {
+        if (router.canGoBack()) {
+          router.back();
+        } else {
+          router.replace('/settings');
+        }
+      } else {
+        router.replace('/login');
+      }
+    }
   };
 
   return (
@@ -240,6 +290,59 @@ export default function ServerConfigScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Confirmation Modal for Domain Change while Authenticated */}
+      <Modal
+        visible={showConfirmModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View
+            style={[
+              styles.modalCard,
+              {
+                backgroundColor: palette.surfaceContainer,
+                borderColor: palette.outlineVariant,
+              },
+            ]}
+          >
+            <View style={[styles.modalIconBox, { backgroundColor: palette.errorContainer }]}>
+              <Icon name="warning" size={32} color={palette.error} />
+            </View>
+
+            <Text style={[styles.modalTitle, { color: palette.onSurface }]}>
+              {language === 'zh' ? '确认更改服务端域名？' : 'Confirm Domain Change'}
+            </Text>
+            <Text style={[styles.modalMsg, { color: palette.onSurfaceVariant }]}>
+              {language === 'zh'
+                ? '检测到服务器地址发生变更。保存新地址将自动清除当前账号的登录状态并重新加载云端数据，是否确认继续？'
+                : 'Server address has changed. Saving will log out current session to reload new server data. Proceed?'}
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                onPress={() => setShowConfirmModal(false)}
+                style={[styles.modalCancelBtn, { borderColor: palette.outlineVariant }]}
+              >
+                <Text style={[styles.modalCancelText, { color: palette.onSurfaceVariant }]}>
+                  {t('cancelButton', language)}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmChangeDomain}
+                style={[styles.modalConfirmBtn, { backgroundColor: palette.error }]}
+              >
+                <Text style={styles.modalConfirmText}>
+                  {language === 'zh' ? '确认退出并切换' : 'Logout & Switch'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -376,5 +479,78 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 12,
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: 24,
+    padding: 28,
+    borderWidth: 1,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  modalMsg: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 9999,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalConfirmText: {
+    color: '#ffffff',
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

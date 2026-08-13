@@ -3,6 +3,8 @@ import { NewTokenInput, Token } from '../types/token';
 import { generateBackupCodes, getRemainingSeconds } from '../utils/totp';
 import { storage } from '../utils/storage';
 
+import { getApiUrl } from '../api/client';
+
 interface TokenState {
   tokens: Token[];
   currentUserId: string | null;
@@ -63,7 +65,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Try remote sync to Cloudflare Workers
     try {
-      fetch('/api/tokens', {
+      fetch(getApiUrl('/api/tokens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newToken, userId }),
@@ -91,7 +93,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Sync remote
     try {
-      fetch(`/api/tokens/${id}`, {
+      fetch(getApiUrl(`/api/tokens/${id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...updates, userId }),
@@ -107,7 +109,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Sync remote
     try {
-      fetch(`/api/tokens/${id}?userId=${userId}`, {
+      fetch(getApiUrl(`/api/tokens/${id}?userId=${userId}`), {
         method: 'DELETE',
       }).catch(() => {});
     } catch (_) {}
@@ -131,7 +133,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Try fetch remote tokens from Cloudflare D1
     try {
-      const res = await fetch(`/api/tokens?userId=${activeUserId}`);
+      const res = await fetch(getApiUrl(`/api/tokens?userId=${activeUserId}`));
       if (res.ok) {
         const remoteTokens = await res.json();
         if (Array.isArray(remoteTokens) && remoteTokens.length > 0) {
