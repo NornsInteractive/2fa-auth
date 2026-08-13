@@ -136,40 +136,64 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       const inputHash = await hashPassword(masterPassword);
       const accounts = await storage.get<StoredAccount[]>(USERS_REGISTRY_KEY, []);
-      let targetAccount = accounts.find((acc) => acc.email.toLowerCase() === cleanEmail);
+      const serverUrl = useSettingsStore.getState().serverUrl;
 
-      // Try remote login if not found in local registry
-      if (!targetAccount) {
+      let targetAccount: StoredAccount | null = null;
+      let remoteError: string | null = null;
+
+      // Prioritize remote Cloudflare Worker login if serverUrl is configured
+      if (serverUrl && serverUrl.trim().length > 0) {
         try {
           const res = await fetch(getApiUrl('/api/auth/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: cleanEmail, password: masterPassword }),
           });
+
           if (res.ok) {
             const data = await res.json();
             if (data.user) {
+              const existingIdx = accounts.findIndex((acc) => acc.email.toLowerCase() === cleanEmail);
               targetAccount = {
                 id: data.user.id,
                 name: data.user.name,
                 email: data.user.email,
                 passwordHash: inputHash,
                 securityLevel: (data.user.securityLevel as any) || 'High',
-                avatarUrl: data.user.avatarUrl || `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(cleanEmail)}`,
+                avatarUrl:
+                  data.user.avatarUrl ||
+                  `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(cleanEmail)}`,
                 createdAt: data.user.createdAt || new Date().toISOString(),
               };
-              await storage.set(USERS_REGISTRY_KEY, [...accounts, targetAccount]);
+
+              const updatedAccounts = [...accounts];
+              if (existingIdx >= 0) {
+                updatedAccounts[existingIdx] = targetAccount;
+              } else {
+                updatedAccounts.push(targetAccount);
+              }
+              await storage.set(USERS_REGISTRY_KEY, updatedAccounts);
             }
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            remoteError = errData.error || (res.status === 404 ? '账号不存在，请先注册新账号' : '主密码错误，请重新输入');
           }
-        } catch (_) {}
+        } catch (netErr: any) {
+          // If remote request throws network exception, allow local fallback below
+        }
+      }
+
+      // Fallback to local accounts registry if remote didn't respond or serverUrl is empty
+      if (!targetAccount) {
+        targetAccount = accounts.find((acc) => acc.email.toLowerCase() === cleanEmail) || null;
       }
 
       if (!targetAccount) {
-        return { success: false, error: '账号不存在，请先注册新账号' };
+        return { success: false, error: remoteError || '账号不存在，请先在下方注册新账号' };
       }
 
       if (targetAccount.passwordHash !== inputHash) {
-        return { success: false, error: '主密码错误，请重新输入' };
+        return { success: false, error: remoteError || '主密码错误，请重新输入' };
       }
 
       const user: User = {

@@ -23,13 +23,22 @@ export interface Env {
 const app = new Hono<{ Bindings: Env }>();
 
 // Enable CORS for all routes
-app.use('*', cors());
+app.use(
+  '*',
+  cors({
+    origin: '*',
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
+    exposeHeaders: ['Content-Length'],
+    maxAge: 86400,
+  })
+);
 
 // Health check
 app.get('/api/health', (c) => {
   return c.json({
     status: 'ok',
-    service: 'Fortress Authenticator Cloudflare Worker',
+    service: 'Mimir Authenticator Cloudflare Worker',
     timestamp: new Date().toISOString(),
     environment: c.env.ENVIRONMENT || 'production',
     dbBound: !!c.env.DB,
@@ -118,8 +127,10 @@ app.post('/api/auth/login', async (c) => {
         return c.json({ error: 'User not found' }, 404);
       }
 
-      const hash = await hashPassword(password);
-      if (userRow.password_hash !== hash) {
+      const hashPrimary = await hashPassword(password);
+      const hashLegacy = await hashPasswordLegacy(password);
+
+      if (userRow.password_hash !== hashPrimary && userRow.password_hash !== hashLegacy) {
         return c.json({ error: 'Invalid password' }, 401);
       }
 
@@ -372,8 +383,16 @@ app.delete('/api/tokens/:id', async (c) => {
   }
 });
 
-// Helper password hashing using Web Crypto API
+// Helper password hashing using Web Crypto API (Matching frontend salt)
 async function hashPassword(password: string): Promise<string> {
+  const enc = new TextEncoder();
+  const data = enc.encode(password + 'fortress-auth-salt');
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function hashPasswordLegacy(password: string): Promise<string> {
   const enc = new TextEncoder();
   const data = enc.encode(`fortress_salt_2026_${password}`);
   const hashBuffer = await crypto.subtle.digest('SHA-256', data);

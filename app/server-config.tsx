@@ -68,20 +68,42 @@ export default function ServerConfigScreen() {
     setTesting(true);
 
     try {
-      // Optional ping test
-      const testRes = await fetch(`${cleanUrl}/api/tokens`, { method: 'GET' }).catch(() => null);
-      if (testRes) {
-        setTestSuccessMsg(
-          language === 'zh' ? '服务器连接成功！' : 'Successfully connected to server!'
-        );
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      // Attempt healthcheck or token API ping
+      let testRes = await fetch(`${cleanUrl}/api/health`, {
+        method: 'GET',
+        signal: controller.signal,
+      }).catch(() => null);
+
+      if (!testRes) {
+        testRes = await fetch(`${cleanUrl}/api/tokens`, {
+          method: 'GET',
+          signal: controller.signal,
+        }).catch(() => null);
       }
-    } catch (_) {
-      // Allow proceeding even if offline
-    } finally {
+
+      clearTimeout(timeoutId);
+
+      if (testRes && (testRes.ok || testRes.status === 200 || testRes.status === 400 || testRes.status === 401)) {
+        setTestSuccessMsg(t('serverConnSuccess', language));
+        setServerUrl(cleanUrl);
+        setTimeout(() => {
+          setTesting(false);
+          router.replace('/login');
+        }, 600);
+      } else {
+        setTesting(false);
+        setErrorMsg(t('serverConnFailed', language));
+      }
+    } catch (e: any) {
       setTesting(false);
-      setServerUrl(cleanUrl);
-      // Navigate to login
-      router.replace('/login');
+      setErrorMsg(
+        language === 'zh'
+          ? `无法连接至服务器 (${e.message || '网络连接超时'})。请检查域名拼写及 Worker CORS 配置。`
+          : `Connection failed (${e.message || 'Timeout'}). Please check URL and CORS.`
+      );
     }
   };
 
@@ -117,18 +139,16 @@ export default function ServerConfigScreen() {
 
           {/* Title & Subtitle */}
           <Text style={[styles.title, { color: palette.onSurface }]}>
-            {language === 'zh' ? '配置服务端域名' : 'Server Endpoint Setup'}
+            {t('serverConfigTitle', language)}
           </Text>
           <Text style={[styles.subtitle, { color: palette.onSurfaceVariant }]}>
-            {language === 'zh'
-              ? '请输入您的 Cloudflare Workers 后端服务器地址，以连接云端 D1 数据库并进行跨设备同步。'
-              : 'Enter your Cloudflare Workers backend address to connect to D1 database for cross-device sync.'}
+            {t('serverConfigSub', language)}
           </Text>
 
           {/* URL Input Form */}
           <View style={styles.formGroup}>
             <Text style={[styles.inputLabel, { color: palette.onSurface }]}>
-              {language === 'zh' ? '服务端 URL 地址' : 'Server URL'}
+              {t('serverUrlLabel', language)}
             </Text>
 
             <View
@@ -143,7 +163,7 @@ export default function ServerConfigScreen() {
               <Icon name="link" size={20} color={palette.onSurfaceVariant} style={styles.fieldIcon} />
               <TextInput
                 style={[styles.fieldInput, { color: palette.onSurface }]}
-                placeholder="https://mimir-2fa-api.workers.dev"
+                placeholder={t('serverUrlPlaceholder', language)}
                 placeholderTextColor={palette.outline}
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -183,7 +203,7 @@ export default function ServerConfigScreen() {
                 <>
                   <Icon name="check_circle" size={20} color="#ffffff" />
                   <Text style={styles.primaryButtonText}>
-                    {language === 'zh' ? '保存并继续登录' : 'Save & Proceed to Login'}
+                    {t('saveAndContinue', language)}
                   </Text>
                 </>
               )}
@@ -196,7 +216,7 @@ export default function ServerConfigScreen() {
             >
               <Icon name="phone_iphone" size={18} color={palette.onSurfaceVariant} />
               <Text style={[styles.secondaryButtonText, { color: palette.onSurfaceVariant }]}>
-                {language === 'zh' ? '使用纯本地模式 (跳过)' : 'Use Local Mode (Skip)'}
+                {t('useOfflineMode', language)}
               </Text>
             </TouchableOpacity>
           </View>

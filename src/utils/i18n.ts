@@ -127,6 +127,23 @@ export const TRANSLATIONS = {
     storageUsed: '本地已存储凭据数',
     clearAllData: '清除全部本地数据并重置',
     clearConfirm: '警告：将清除所有本地 2FA 密钥且不可恢复！确认继续？',
+
+    // Server Config & Network
+    serverConfigTitle: '配置服务端域名',
+    serverConfigSub: '请输入您的 Cloudflare Workers 后端服务器地址，以连接云端 D1 数据库并进行跨设备同步。',
+    serverUrlLabel: '服务端 URL 地址',
+    serverUrlPlaceholder: 'https://mimir-2fa-api.workers.dev',
+    saveAndContinue: '测试并保存配置',
+    useOfflineMode: '使用纯本地模式 (跳过)',
+    testingConnection: '正在测试服务器连接与 API 响应...',
+    serverConnSuccess: '服务器连接成功！正在进入应用...',
+    serverConnFailed: '无法连接至目标服务器。请检查域名格式，或确认 Cloudflare Worker 已成功部署且允许 CORS。',
+    serverEndpointUrl: '服务端域名地址',
+    serverUrlConfigured: '服务地址: ',
+    localOfflineMode: '纯本地模式',
+    notConfiguredLocal: '未配置 (纯本地模式)',
+    providersTitle: '服务提供商管理',
+    providerName: '提供商名称',
   },
 
   en: {
@@ -255,10 +272,27 @@ export const TRANSLATIONS = {
     storageUsed: 'Locally Stored Tokens',
     clearAllData: 'Clear All Local Data & Reset',
     clearConfirm: 'Warning: All local tokens will be permanently erased. Proceed?',
+
+    // Server Config & Network
+    serverConfigTitle: 'Server Endpoint Setup',
+    serverConfigSub: 'Enter your Cloudflare Workers backend address to connect to D1 database for cross-device sync.',
+    serverUrlLabel: 'Server URL Address',
+    serverUrlPlaceholder: 'https://mimir-2fa-api.workers.dev',
+    saveAndContinue: 'Test & Save Configuration',
+    useOfflineMode: 'Use Local Mode (Skip)',
+    testingConnection: 'Testing server connection & API response...',
+    serverConnSuccess: 'Server connection successful! Entering app...',
+    serverConnFailed: 'Cannot connect to target server. Please check URL format or ensure Cloudflare Worker is deployed with CORS enabled.',
+    serverEndpointUrl: 'Server Endpoint URL',
+    serverUrlConfigured: 'Server: ',
+    localOfflineMode: 'Local Mode',
+    notConfiguredLocal: 'Not configured (Local Mode)',
+    providersTitle: 'Provider Management',
+    providerName: 'Provider Name',
   },
 };
 
-export function t(key: keyof typeof TRANSLATIONS.en, lang: Language = 'zh'): string {
+export function t(key: keyof typeof TRANSLATIONS.zh, lang: Language = 'zh'): string {
   const dict = TRANSLATIONS[lang] || TRANSLATIONS.zh;
-  return (dict as any)[key] || (TRANSLATIONS.en as any)[key] || key;
+  return (dict as any)[key] || (TRANSLATIONS.zh as any)[key] || (TRANSLATIONS.en as any)[key] || key;
 }
