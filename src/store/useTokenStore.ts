@@ -27,6 +27,25 @@ interface TokenState {
 const getTokenStorageKey = (userId?: string | null) =>
   userId ? `fortress_tokens_user_${userId}` : 'fortress_tokens_guest';
 
+const normalizeToken = (t: any): Token => ({
+  id: t.id,
+  userId: t.userId || t.user_id || '',
+  categoryId: t.categoryId || t.category_id || 'all',
+  issuer: t.issuer || '',
+  accountName: t.accountName || t.account_name || '',
+  secretKey: t.secretKey || t.secret_key || '',
+  algorithm: t.algorithm || 'SHA1',
+  digits: t.digits || 6,
+  period: t.period || 30,
+  iconType: t.iconType || t.icon_type || 'shield',
+  notes: t.notes || '',
+  backupCodes: Array.isArray(t.backupCodes)
+    ? t.backupCodes
+    : (typeof t.backup_codes === 'string' ? JSON.parse(t.backup_codes || '[]') : []),
+  createdAt: t.createdAt || t.created_at || new Date().toISOString(),
+  updatedAt: t.updatedAt || t.updated_at || new Date().toISOString(),
+});
+
 export const useTokenStore = create<TokenState>((set, get) => ({
   tokens: [],
   currentUserId: null,
@@ -137,13 +156,13 @@ export const useTokenStore = create<TokenState>((set, get) => ({
       if (res.ok) {
         const remoteTokens = await res.json();
         if (Array.isArray(remoteTokens) && remoteTokens.length > 0) {
-          saved = remoteTokens;
+          saved = remoteTokens.map(normalizeToken);
           await storage.set(storageKey, saved);
         }
       }
     } catch (_) {}
 
-    set({ tokens: saved || [] });
+    set({ tokens: (saved || []).map(normalizeToken) });
   },
 
   resetToDefault: async () => {

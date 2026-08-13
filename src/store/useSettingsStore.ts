@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { Platform } from 'react-native';
 import { AppSettings, Language, ThemeColorKey, ThemeMode } from '../types/settings';
 import { storage } from '../utils/storage';
 
@@ -15,6 +16,7 @@ interface SettingsState extends AppSettings {
 }
 
 const SETTINGS_STORAGE_KEY = 'fortress_settings_v1';
+const isWeb = Platform.OS === 'web';
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
   language: 'zh',
@@ -27,7 +29,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   hideCodesByDefault: false,
   hapticsEnabled: true,
   serverUrl: '',
-  serverConfigured: false,
+  serverConfigured: isWeb,
 
   setLanguage: (language) => {
     set({ language });

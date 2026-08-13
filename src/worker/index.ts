@@ -189,7 +189,17 @@ app.get('/api/categories', async (c) => {
       results = queryRes.results || [];
     }
 
-    return c.json(results);
+    const formatted = (results || []).map((row: any) => ({
+      id: row.id,
+      userId: row.user_id || row.userId,
+      name: row.name,
+      slug: row.slug,
+      icon: row.icon || 'folder',
+      color: row.color || '#005ac1',
+      isDefault: Boolean(row.is_default ?? row.isDefault),
+    }));
+
+    return c.json(formatted);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }
@@ -261,8 +271,22 @@ app.get('/api/tokens', async (c) => {
       .all();
 
     const formatted = (results || []).map((row: any) => ({
-      ...row,
-      backupCodes: row.backup_codes ? JSON.parse(row.backup_codes) : [],
+      id: row.id,
+      userId: row.user_id || row.userId,
+      categoryId: row.category_id || row.categoryId || 'all',
+      issuer: row.issuer || '',
+      accountName: row.account_name || row.accountName || '',
+      secretKey: row.secret_key || row.secretKey || '',
+      algorithm: row.algorithm || 'SHA1',
+      digits: row.digits || 6,
+      period: row.period || 30,
+      iconType: row.icon_type || row.iconType || 'shield',
+      notes: row.notes || '',
+      backupCodes: typeof row.backup_codes === 'string'
+        ? (JSON.parse(row.backup_codes || '[]'))
+        : (row.backupCodes || []),
+      createdAt: row.created_at || row.createdAt,
+      updatedAt: row.updated_at || row.updatedAt,
     }));
 
     return c.json(formatted);
@@ -400,7 +424,16 @@ app.get('/api/providers', async (c) => {
       .bind(userId)
       .all();
 
-    return c.json(results || []);
+    const formatted = (results || []).map((row: any) => ({
+      id: row.id,
+      userId: row.user_id || row.userId,
+      name: row.name,
+      icon: row.icon || 'shield',
+      color: row.color || '#005ac1',
+      isDefault: Boolean(row.is_default ?? row.isDefault),
+    }));
+
+    return c.json(formatted);
   } catch (err: any) {
     return c.json({ error: err.message }, 500);
   }

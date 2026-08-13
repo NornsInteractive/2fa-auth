@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useSettingsStore } from '../../src/store/useSettingsStore';
@@ -29,9 +29,9 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Check server domain setup
+  // Check server domain setup only for Native mobile APK (Web uses relative server path)
   useEffect(() => {
-    if (!serverConfigured) {
+    if (Platform.OS !== 'web' && !serverConfigured) {
       router.replace('/server-config');
     }
   }, [serverConfigured]);
