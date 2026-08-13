@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Provider, NewProviderInput } from '../types/provider';
 import { storage } from '../utils/storage';
+import { getApiUrl } from '../api/client';
 
 export const DEFAULT_PROVIDERS: Provider[] = [
   { id: 'google', name: 'Google', icon: 'language', color: '#4285F4', isDefault: true },
@@ -37,12 +38,26 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     set({ currentUserId: activeUserId || null });
 
     const storageKey = getProviderStorageKey(activeUserId);
-    const saved = await storage.get<Provider[]>(storageKey, []);
+    let saved = await storage.get<Provider[]>(storageKey, []);
+
+    // Try fetch remote providers
+    if (activeUserId) {
+      try {
+        const res = await fetch(getApiUrl(`/api/providers?userId=${activeUserId}`));
+        if (res.ok) {
+          const remoteProviders = await res.json();
+          if (Array.isArray(remoteProviders) && remoteProviders.length > 0) {
+            saved = remoteProviders;
+          }
+        }
+      } catch (_) {}
+    }
 
     if (saved && saved.length > 0) {
-      // Merge with default providers
       const customOnes = saved.filter((p) => !DEFAULT_PROVIDERS.some((d) => d.id === p.id));
-      set({ providers: [...DEFAULT_PROVIDERS, ...customOnes] });
+      const merged = [...DEFAULT_PROVIDERS, ...customOnes];
+      set({ providers: merged });
+      await storage.set(storageKey, merged);
     } else {
       set({ providers: DEFAULT_PROVIDERS });
       await storage.set(storageKey, DEFAULT_PROVIDERS);
@@ -62,6 +77,16 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     const next = [...get().providers, newProvider];
     set({ providers: next });
     await storage.set(getProviderStorageKey(userId), next);
+
+    // Sync remote
+    try {
+      fetch(getApiUrl('/api/providers'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...input, userId }),
+      }).catch(() => {});
+    } catch (_) {}
+
     return newProvider;
   },
 
@@ -73,5 +98,11 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     const next = get().providers.filter((p) => p.id !== id);
     set({ providers: next });
     await storage.set(getProviderStorageKey(userId), next);
+
+    try {
+      fetch(getApiUrl(`/api/providers/${id}?userId=${userId}`), {
+        method: 'DELETE',
+      }).catch(() => {});
+    } catch (_) {}
   },
 }));

@@ -57,3 +57,16 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 CREATE INDEX IF NOT EXISTS idx_tokens_user ON tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_tokens_category ON tokens(category_id);
 CREATE INDEX IF NOT EXISTS idx_categories_user ON categories(user_id);
+
+CREATE TABLE IF NOT EXISTS providers (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    icon TEXT DEFAULT 'shield',
+    color TEXT DEFAULT '#005ac1',
+    is_default BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_providers_user ON providers(user_id);

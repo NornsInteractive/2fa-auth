@@ -7,6 +7,11 @@ compatibility_flags = ["nodejs_compat"]
 directory = "./dist"
 binding = "ASSETS"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "2fa-db"
+database_id = "5741847e-0858-4b18-a63f-4c68c115b22a"
+
 [vars]
 ENVIRONMENT = "production"
 JWT_SECRET = "fortress-secure-jwt-vault-token-2026"

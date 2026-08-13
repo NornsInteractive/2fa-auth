@@ -383,6 +383,72 @@ app.delete('/api/tokens/:id', async (c) => {
   }
 });
 
+// -------------------------------------------------------------
+// Providers Endpoints
+// -------------------------------------------------------------
+
+app.get('/api/providers', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    if (!c.env.DB || !userId) {
+      return c.json([]);
+    }
+
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM providers WHERE user_id = ? ORDER BY created_at ASC'
+    )
+      .bind(userId)
+      .all();
+
+    return c.json(results || []);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.post('/api/providers', async (c) => {
+  try {
+    const body = await c.req.json();
+    const userId = body.userId;
+    if (!userId) {
+      return c.json({ error: 'userId is required' }, 400);
+    }
+
+    const id = `prov_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const name = body.name || 'New Provider';
+    const icon = body.icon || 'shield';
+    const color = body.color || '#005ac1';
+
+    if (c.env.DB) {
+      await c.env.DB.prepare(
+        'INSERT INTO providers (id, user_id, name, icon, color, is_default) VALUES (?, ?, ?, ?, ?, 0)'
+      )
+        .bind(id, userId, name, icon, color)
+        .run();
+    }
+
+    return c.json({ id, userId, name, icon, color, isDefault: false }, 201);
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
+app.delete('/api/providers/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const userId = c.req.query('userId');
+
+    if (c.env.DB && userId) {
+      await c.env.DB.prepare('DELETE FROM providers WHERE id = ? AND user_id = ?')
+        .bind(id, userId)
+        .run();
+    }
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500);
+  }
+});
+
 // Helper password hashing using Web Crypto API (Matching frontend salt)
 async function hashPassword(password: string): Promise<string> {
   const enc = new TextEncoder();
