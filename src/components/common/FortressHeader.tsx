@@ -58,20 +58,6 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
 
         {/* Action Controls */}
         <View style={styles.headerControls}>
-          {/* Manual Refresh Button */}
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={refreshTokens}
-            disabled={isRefreshing}
-            style={[styles.iconButton, { backgroundColor: palette.surfaceContainerLow }]}
-            accessibilityLabel="Refresh Token List"
-          >
-            {isRefreshing ? (
-              <ActivityIndicator size="small" color={palette.primary} />
-            ) : (
-              <Icon name="refresh" size={18} color={palette.onSurfaceVariant} />
-            )}
-          </TouchableOpacity>
           {/* Theme Color Picker Button */}
           <TouchableOpacity
             activeOpacity={0.7}
@@ -153,7 +139,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
         </View>
       </View>
 
-      {/* Search Input Bar + Add Token Button */}
+      {/* Search Input Bar + Refresh List + Add Token Button */}
       <View style={styles.searchBarRow}>
         <View
           style={[
@@ -179,6 +165,29 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Refresh List Button next to search input */}
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={refreshTokens}
+          disabled={isRefreshing}
+          style={[
+            styles.refreshListBtn,
+            {
+              backgroundColor: palette.secondaryContainer,
+              borderColor: palette.outlineVariant,
+            },
+          ]}
+        >
+          {isRefreshing ? (
+            <ActivityIndicator size="small" color={palette.onSecondaryContainer} />
+          ) : (
+            <Icon name="refresh" size={16} color={palette.onSecondaryContainer} />
+          )}
+          <Text style={[styles.refreshListBtnText, { color: palette.onSecondaryContainer }]}>
+            {language === 'zh' ? '刷新列表' : 'Refresh List'}
+          </Text>
+        </TouchableOpacity>
 
         {/* Add Token Button next to search input */}
         <TouchableOpacity
@@ -359,6 +368,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter, system-ui, sans-serif',
     fontSize: 14,
     paddingVertical: 2,
+  },
+  refreshListBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 9999,
+    borderWidth: 1,
+    cursor: 'pointer',
+  },
+  refreshListBtnText: {
+    fontFamily: 'Inter, system-ui, sans-serif',
+    fontSize: 13,
+    fontWeight: '700',
   },
   addTokenBtn: {
     flexDirection: 'row',
