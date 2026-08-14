@@ -25,10 +25,15 @@ export const FortressSidebar: React.FC<FortressSidebarProps> = ({ onOpenAddModal
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
 
+  const isAdmin = user?.role === 'admin' || user?.isAdmin;
+
   const navItems = [
     { label: t('navHome', language), path: '/', icon: 'home' },
     { label: t('navCategories', language), path: '/categories', icon: 'folder' },
     { label: language === 'zh' ? '提供商' : 'Providers', path: '/providers', icon: 'hub' },
+    ...(isAdmin
+      ? [{ label: language === 'zh' ? '管理控制台' : 'Admin Console', path: '/admin', icon: 'admin_panel_settings' }]
+      : []),
     { label: t('navSettings', language), path: '/settings', icon: 'settings' },
   ];
 

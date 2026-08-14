@@ -16,6 +16,9 @@ export interface StoredAccount {
   passwordHash: string;
   securityLevel: 'High' | 'Standard' | 'Maximum';
   avatarUrl: string;
+  role?: 'admin' | 'user';
+  isAdmin?: boolean;
+  status?: 'active' | 'disabled';
   createdAt: string;
 }
 
@@ -37,9 +40,9 @@ interface AuthState {
   loadAuth: () => Promise<void>;
 }
 
-const SESSION_STORAGE_KEY = 'fortress_session_v2';
-const USERS_REGISTRY_KEY = 'fortress_users_registry_v2';
-const VAULT_LOCK_STORAGE_KEY = 'fortress_vault_lock_v2';
+const SESSION_STORAGE_KEY = 'fortress_auth_session_v1';
+const VAULT_LOCK_STORAGE_KEY = 'fortress_vault_locked_v1';
+const USERS_REGISTRY_KEY = 'fortress_users_registry_v1';
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -58,8 +61,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const cleanEmail = email.trim().toLowerCase();
       const cleanName = name.trim();
 
-      if (!cleanEmail || !cleanName || !masterPassword) {
-        return { success: false, error: '所有字段均为必填' };
+      if (!cleanEmail || !masterPassword || !cleanName) {
+        return { success: false, error: '请完整填写所有必填字段' };
       }
 
       // Check existing accounts in local registry
@@ -71,36 +74,55 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const pwdHash = await hashPassword(masterPassword);
       const userId = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+      const serverUrl = useSettingsStore.getState().serverUrl;
+      let remoteUserData: any = null;
+
+      // Try sync to Cloudflare Workers if online
+      if (serverUrl && serverUrl.trim().length > 0) {
+        try {
+          const res = await fetchEncrypted(getApiUrl('/api/auth/register'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: cleanName, email: cleanEmail, password: masterPassword }),
+          });
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            return { success: false, error: errData.error || '注册失败，请稍后重试' };
+          }
+          const regRes = await res.json().catch(() => ({}));
+          remoteUserData = regRes.user;
+        } catch (_) {}
+      }
+
+      const finalUserId = remoteUserData?.id || userId;
       const newAccount: StoredAccount = {
-        id: userId,
+        id: finalUserId,
         name: cleanName,
         email: cleanEmail,
         passwordHash: pwdHash,
         securityLevel: 'High',
         avatarUrl: `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(cleanEmail)}`,
+        role: 'user',
+        isAdmin: false,
+        status: 'active',
         createdAt: new Date().toISOString(),
       };
 
       // Save to local registry
       await storage.set(USERS_REGISTRY_KEY, [...accounts, newAccount]);
 
-      // Try sync to Cloudflare Workers if online
-      try {
-        fetchEncrypted(getApiUrl('/api/auth/register'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: cleanName, email: cleanEmail, password: masterPassword }),
-        }).catch(() => {});
-      } catch (_) {}
-
       const user: User = {
-        id: userId,
+        id: finalUserId,
         name: cleanName,
         email: cleanEmail,
         securityLevel: 'High',
         avatarUrl: newAccount.avatarUrl,
         biometricsEnabled: true,
         autoLockMinutes: 5,
+        role: 'user',
+        isAdmin: false,
+        status: 'active',
         createdAt: newAccount.createdAt,
       };
 
@@ -117,9 +139,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.set(VAULT_LOCK_STORAGE_KEY, false);
 
       // Load user-isolated tokens, categories, and providers
-      await useTokenStore.getState().loadTokens(userId);
-      await useCategoryStore.getState().loadCategories(userId);
-      await useProviderStore.getState().loadProviders(userId);
+      await useTokenStore.getState().loadTokens(finalUserId);
+      await useCategoryStore.getState().loadCategories(finalUserId);
+      await useProviderStore.getState().loadProviders(finalUserId);
 
       return { success: true };
     } catch (e: any) {
@@ -154,6 +176,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             const data = await res.json();
             if (data.user) {
               const existingIdx = accounts.findIndex((acc) => acc.email.toLowerCase() === cleanEmail);
+              const isAdmin = data.user.role === 'admin' || data.user.isAdmin === true;
               targetAccount = {
                 id: data.user.id,
                 name: data.user.name,
@@ -163,6 +186,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
                 avatarUrl:
                   data.user.avatarUrl ||
                   `https://api.dicebear.com/7.x/identicon/png?seed=${encodeURIComponent(cleanEmail)}`,
+                role: isAdmin ? 'admin' : 'user',
+                isAdmin,
+                status: data.user.status || 'active',
                 createdAt: data.user.createdAt || new Date().toISOString(),
               };
 
@@ -177,6 +203,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           } else {
             const errData = await res.json().catch(() => ({}));
             remoteError = errData.error || (res.status === 404 ? '账号不存在，请先注册新账号' : '主密码错误，请重新输入');
+            return { success: false, error: remoteError };
           }
         } catch (netErr: any) {
           // If remote request throws network exception, allow local fallback below
@@ -192,6 +219,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return { success: false, error: remoteError || '账号不存在，请先在下方注册新账号' };
       }
 
+      if (targetAccount.status === 'disabled') {
+        return { success: false, error: '该账号已被管理员禁用，请联系管理员' };
+      }
+
       if (targetAccount.passwordHash !== inputHash) {
         return { success: false, error: remoteError || '主密码错误，请重新输入' };
       }
@@ -204,6 +235,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         avatarUrl: targetAccount.avatarUrl,
         biometricsEnabled: true,
         autoLockMinutes: 5,
+        role: targetAccount.role || (targetAccount.isAdmin ? 'admin' : 'user'),
+        isAdmin: targetAccount.isAdmin || targetAccount.role === 'admin',
+        status: targetAccount.status || 'active',
         createdAt: targetAccount.createdAt,
       };
 

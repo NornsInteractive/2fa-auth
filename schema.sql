@@ -7,7 +7,15 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT NOT NULL,
     security_level TEXT DEFAULT 'High',
     avatar_url TEXT,
+    role TEXT DEFAULT 'user', -- 'admin' or 'user'
+    status TEXT DEFAULT 'active', -- 'active' or 'disabled'
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

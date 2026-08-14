@@ -6,6 +6,9 @@ export interface User {
   avatarUrl: string;
   biometricsEnabled: boolean;
   autoLockMinutes: number;
+  role?: 'admin' | 'user';
+  isAdmin?: boolean;
+  status?: 'active' | 'disabled';
   createdAt: string;
 }
 

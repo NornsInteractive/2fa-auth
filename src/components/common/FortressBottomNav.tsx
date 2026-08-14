@@ -6,20 +6,27 @@ import { getColorPalette } from '../../theme/colors';
 import { t } from '../../utils/i18n';
 import { Icon } from './Icon';
 
+import { useAuthStore } from '../../store/useAuthStore';
+
 export const FortressBottomNav: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
   const themeMode = useSettingsStore((s) => s.themeMode);
   const themeColor = useSettingsStore((s) => s.themeColor);
   const language = useSettingsStore((s) => s.language);
 
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
+  const isAdmin = user?.role === 'admin' || user?.isAdmin;
 
   const navItems = [
     { label: t('navHome', language), path: '/', icon: 'home' },
     { label: t('navCategories', language), path: '/categories', icon: 'folder' },
     { label: language === 'zh' ? '提供商' : 'Providers', path: '/providers', icon: 'hub' },
+    ...(isAdmin
+      ? [{ label: language === 'zh' ? '管理' : 'Admin', path: '/admin', icon: 'admin_panel_settings' }]
+      : []),
     { label: t('navSettings', language), path: '/settings', icon: 'settings' },
   ];
 

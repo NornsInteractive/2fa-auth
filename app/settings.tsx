@@ -97,6 +97,46 @@ export default function SettingsScreen() {
               </Text>
             </View>
 
+            {/* Admin Console Entry (Only for Admin) */}
+            {(user?.role === 'admin' || user?.isAdmin) && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => router.push('/admin')}
+                style={[
+                  styles.cardRow,
+                  {
+                    backgroundColor: palette.primaryContainer,
+                    borderColor: palette.primary,
+                    paddingVertical: 14,
+                  },
+                ]}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 18,
+                      backgroundColor: palette.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Icon name="admin_panel_settings" size={20} color="#ffffff" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: palette.onPrimaryContainer }}>
+                      {language === 'zh' ? '进入系统管理控制台' : 'Enter Admin Console'}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: palette.onPrimaryContainer, opacity: 0.85 }}>
+                      {language === 'zh' ? '管理全员用户、重置密码及全局注册策略' : 'Manage users, reset passwords & global policies'}
+                    </Text>
+                  </View>
+                </View>
+                <Icon name="chevron_right" size={22} color={palette.onPrimaryContainer} />
+              </TouchableOpacity>
+            )}
+
             {/* Section 1: Appearance & Personalization */}
             <View style={styles.section}>
               <Text style={[styles.sectionHeading, { color: palette.primary }]}>

@@ -18,6 +18,8 @@ export interface Env {
   DB?: D1Database;
   ENVIRONMENT?: string;
   JWT_SECRET?: string;
+  ADMIN_EMAIL?: string;
+  ADMIN_PASSWORD?: string;
 }
 
 const app = new Hono<{ Bindings: Env }>();
@@ -146,16 +148,31 @@ app.post('/api/auth/register', async (c) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    const adminEmail = (c.env.ADMIN_EMAIL || 'admin@mimir.app').toLowerCase().trim();
+
+    if (cleanEmail === adminEmail) {
+      return jsonEncrypted(c, { error: '该邮箱为系统管理员专属账号，不允许注册' }, 400);
+    }
+
     const userId = `usr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
     if (c.env.DB) {
+      await initDbTables(c.env.DB);
+
+      // Check if registration is open
+      const regSetting = await c.env.DB.prepare("SELECT value FROM system_settings WHERE key = 'allow_registration'")
+        .first().catch(() => null);
+      if (regSetting && (regSetting.value === '0' || regSetting.value === 'false')) {
+        return jsonEncrypted(c, { error: '系统已由管理员关闭公开注册，请联系管理员分配账号' }, 403);
+      }
+
       // Check if user already exists
       const existing = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?')
         .bind(cleanEmail)
         .first();
 
       if (existing) {
-        return c.json({ error: 'Email is already registered' }, 409);
+        return jsonEncrypted(c, { error: '该邮箱已被注册，请直接登录' }, 409);
       }
 
       // Simple salted SHA-256 hash
@@ -163,9 +180,9 @@ app.post('/api/auth/register', async (c) => {
 
       // Insert new user
       await c.env.DB.prepare(
-        'INSERT INTO users (id, name, email, password_hash, security_level) VALUES (?, ?, ?, ?, ?)'
+        'INSERT INTO users (id, name, email, password_hash, security_level, role, status) VALUES (?, ?, ?, ?, ?, ?, ?)'
       )
-        .bind(userId, name.trim(), cleanEmail, passwordHash, 'High')
+        .bind(userId, name.trim(), cleanEmail, passwordHash, 'High', 'user', 'active')
         .run();
 
       // Insert standard default categories for this user
@@ -189,6 +206,9 @@ app.post('/api/auth/register', async (c) => {
       name: name.trim(),
       email: cleanEmail,
       securityLevel: 'High',
+      role: 'user',
+      isAdmin: false,
+      status: 'active',
       createdAt: new Date().toISOString(),
     };
 
@@ -206,21 +226,60 @@ app.post('/api/auth/login', async (c) => {
     }
 
     const cleanEmail = email.toLowerCase().trim();
+    const adminEmail = (c.env.ADMIN_EMAIL || 'admin@mimir.app').toLowerCase().trim();
+    const adminPassword = c.env.ADMIN_PASSWORD || 'admin';
 
+    // 1. Check if trying to log in as administrator
+    if (cleanEmail === adminEmail) {
+      const isPasswordMatch = password === adminPassword;
+      if (!isPasswordMatch) {
+        return jsonEncrypted(c, { error: '管理员主密码错误，请重新输入' }, 401);
+      }
+
+      if (c.env.DB) {
+        await initDbTables(c.env.DB);
+        // Ensure admin_root exists in users table
+        await c.env.DB.prepare(
+          'INSERT OR IGNORE INTO users (id, name, email, password_hash, role, status) VALUES (?, ?, ?, ?, ?, ?)'
+        )
+          .bind('admin_root', 'Administrator', adminEmail, 'admin_hash_placeholder', 'admin', 'active')
+          .run().catch(() => {});
+      }
+
+      const adminUser = {
+        id: 'admin_root',
+        name: 'Administrator',
+        email: adminEmail,
+        securityLevel: 'Maximum',
+        role: 'admin',
+        isAdmin: true,
+        status: 'active',
+        createdAt: new Date().toISOString(),
+      };
+
+      return jsonEncrypted(c, { user: adminUser, token: `jwt_admin_root_${Date.now()}` });
+    }
+
+    // 2. Regular user login
     if (c.env.DB) {
+      await initDbTables(c.env.DB);
       const userRow = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?')
         .bind(cleanEmail)
         .first();
 
       if (!userRow) {
-        return jsonEncrypted(c, { error: 'User not found' }, 404);
+        return jsonEncrypted(c, { error: '账号不存在，请先注册新账号' }, 404);
+      }
+
+      if (userRow.status === 'disabled') {
+        return jsonEncrypted(c, { error: '该账号已被管理员禁用，请联系管理员' }, 403);
       }
 
       const hashPrimary = await hashPassword(password);
       const hashLegacy = await hashPasswordLegacy(password);
 
       if (userRow.password_hash !== hashPrimary && userRow.password_hash !== hashLegacy) {
-        return jsonEncrypted(c, { error: 'Invalid password' }, 401);
+        return jsonEncrypted(c, { error: '主密码错误，请重新输入' }, 401);
       }
 
       const user = {
@@ -229,6 +288,9 @@ app.post('/api/auth/login', async (c) => {
         email: userRow.email,
         securityLevel: userRow.security_level || 'High',
         avatarUrl: userRow.avatar_url,
+        role: userRow.role || 'user',
+        isAdmin: userRow.role === 'admin',
+        status: userRow.status || 'active',
         createdAt: userRow.created_at,
       };
 
@@ -243,12 +305,166 @@ app.post('/api/auth/login', async (c) => {
         name: cleanEmail.split('@')[0],
         email: cleanEmail,
         securityLevel: 'High',
+        role: 'user',
+        isAdmin: false,
+        status: 'active',
         createdAt: new Date().toISOString(),
       },
       token: `jwt_${fallbackUserId}_${Date.now()}`,
     });
   } catch (err: any) {
     return c.json({ error: err.message || 'Login failed' }, 500);
+  }
+});
+
+// -------------------------------------------------------------
+// Admin Console Endpoints (User Directory, Password Reset, Status Toggle, Stats)
+// -------------------------------------------------------------
+
+app.get('/api/admin/users', async (c) => {
+  try {
+    if (!c.env.DB) return jsonEncrypted(c, []);
+    await initDbTables(c.env.DB);
+
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        u.id, 
+        u.name, 
+        u.email, 
+        u.security_level AS securityLevel, 
+        u.avatar_url AS avatarUrl, 
+        u.role, 
+        u.status, 
+        u.created_at AS createdAt,
+        (SELECT COUNT(*) FROM tokens t WHERE t.user_id = u.id) AS tokensCount
+      FROM users u
+      ORDER BY u.created_at DESC
+    `).all();
+
+    return jsonEncrypted(c, results || []);
+  } catch (err: any) {
+    return jsonEncrypted(c, { error: err.message }, 500);
+  }
+});
+
+app.post('/api/admin/reset-password', async (c) => {
+  try {
+    const { targetUserId, newPassword } = await getReqBodyDecrypted(c);
+    if (!targetUserId || !newPassword) {
+      return jsonEncrypted(c, { error: 'targetUserId and newPassword are required' }, 400);
+    }
+
+    if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      const newHash = await hashPassword(newPassword);
+      await c.env.DB.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(newHash, targetUserId)
+        .run();
+    }
+
+    return jsonEncrypted(c, { success: true, message: '密码已成功重置' });
+  } catch (err: any) {
+    return jsonEncrypted(c, { error: err.message }, 500);
+  }
+});
+
+app.post('/api/admin/toggle-status', async (c) => {
+  try {
+    const { targetUserId, status } = await getReqBodyDecrypted(c);
+    if (!targetUserId || !status) {
+      return jsonEncrypted(c, { error: 'targetUserId and status are required' }, 400);
+    }
+
+    if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      await c.env.DB.prepare('UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        .bind(status, targetUserId)
+        .run();
+    }
+
+    return jsonEncrypted(c, { success: true, status });
+  } catch (err: any) {
+    return jsonEncrypted(c, { error: err.message }, 500);
+  }
+});
+
+app.delete('/api/admin/users/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    if (!id || id === 'admin_root') {
+      return jsonEncrypted(c, { error: '不允许删除超级管理员账号' }, 400);
+    }
+
+    if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      await c.env.DB.prepare('DELETE FROM tokens WHERE user_id = ?').bind(id).run().catch(() => {});
+      await c.env.DB.prepare('DELETE FROM categories WHERE user_id = ?').bind(id).run().catch(() => {});
+      await c.env.DB.prepare('DELETE FROM providers WHERE user_id = ?').bind(id).run().catch(() => {});
+      await c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+    }
+
+    return jsonEncrypted(c, { success: true });
+  } catch (err: any) {
+    return jsonEncrypted(c, { error: err.message }, 500);
+  }
+});
+
+app.get('/api/admin/settings', async (c) => {
+  try {
+    if (!c.env.DB) return jsonEncrypted(c, { allowRegistration: true });
+    await initDbTables(c.env.DB);
+
+    const setting = await c.env.DB.prepare("SELECT value FROM system_settings WHERE key = 'allow_registration'")
+      .first().catch(() => null);
+
+    const allowRegistration = setting ? setting.value === '1' || setting.value === 'true' : true;
+    return jsonEncrypted(c, { allowRegistration });
+  } catch (err: any) {
+    return jsonEncrypted(c, { allowRegistration: true });
+  }
+});
+
+app.post('/api/admin/settings', async (c) => {
+  try {
+    const { allowRegistration } = await getReqBodyDecrypted(c);
+    const valStr = allowRegistration ? '1' : '0';
+
+    if (c.env.DB) {
+      await initDbTables(c.env.DB);
+      await c.env.DB.prepare(`
+        INSERT INTO system_settings (key, value, updated_at) VALUES ('allow_registration', ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+      `)
+        .bind(valStr)
+        .run();
+    }
+
+    return jsonEncrypted(c, { success: true, allowRegistration });
+  } catch (err: any) {
+    return jsonEncrypted(c, { error: err.message }, 500);
+  }
+});
+
+app.get('/api/admin/stats', async (c) => {
+  try {
+    if (!c.env.DB) {
+      return jsonEncrypted(c, { totalUsers: 0, totalTokens: 0, totalCategories: 0, totalProviders: 0 });
+    }
+    await initDbTables(c.env.DB);
+
+    const usersCount = (await c.env.DB.prepare('SELECT COUNT(*) AS count FROM users').first())?.count || 0;
+    const tokensCount = (await c.env.DB.prepare('SELECT COUNT(*) AS count FROM tokens').first())?.count || 0;
+    const categoriesCount = (await c.env.DB.prepare('SELECT COUNT(*) AS count FROM categories').first())?.count || 0;
+    const providersCount = (await c.env.DB.prepare('SELECT COUNT(*) AS count FROM providers').first())?.count || 0;
+
+    return jsonEncrypted(c, {
+      totalUsers: usersCount,
+      totalTokens: tokensCount,
+      totalCategories: categoriesCount,
+      totalProviders: providersCount,
+    });
+  } catch (err: any) {
+    return jsonEncrypted(c, { totalUsers: 0, totalTokens: 0, totalCategories: 0, totalProviders: 0 });
   }
 });
 
@@ -540,9 +756,27 @@ async function initDbTables(db: any) {
         password_hash TEXT NOT NULL,
         security_level TEXT DEFAULT 'High',
         avatar_url TEXT,
+        role TEXT DEFAULT 'user',
+        status TEXT DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
+    `).run().catch(() => {});
+
+    // Try adding missing columns if table already existed in older versions
+    await db.prepare("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'").run().catch(() => {});
+    await db.prepare("ALTER TABLE users ADD COLUMN status TEXT DEFAULT 'active'").run().catch(() => {});
+
+    await db.prepare(`
+      CREATE TABLE IF NOT EXISTS system_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `).run().catch(() => {});
+
+    await db.prepare(`
+      INSERT OR IGNORE INTO system_settings (key, value) VALUES ('allow_registration', '1')
     `).run().catch(() => {});
 
     await db.prepare(`
