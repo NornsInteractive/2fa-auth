@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useAddCategoryMutation } from '../../api/hooks';
 import { getColorPalette } from '../../theme/colors';
@@ -57,14 +57,17 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onC
   const [selectedIcon, setSelectedIcon] = useState('folder');
   const [selectedColor, setSelectedColor] = useState('#005ac1');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (isSubmitting || addCategoryMutation.isPending) return;
     if (!name.trim()) {
       setError(t('categoryNamePlaceholder', language));
       return;
     }
 
     try {
+      setIsSubmitting(true);
       await addCategoryMutation.mutateAsync({
         name: name.trim(),
         icon: selectedIcon,
@@ -79,6 +82,8 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onC
       onClose();
     } catch (e: any) {
       setError(e.message || 'Failed to create category');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -212,9 +217,28 @@ export const AddCategoryModal: React.FC<AddCategoryModalProps> = ({ visible, onC
 
             <TouchableOpacity
               onPress={handleSubmit}
-              style={[styles.submitBtn, { backgroundColor: palette.primary }]}
+              disabled={isSubmitting || addCategoryMutation.isPending}
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: palette.primary,
+                  opacity: isSubmitting || addCategoryMutation.isPending ? 0.7 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                },
+              ]}
             >
-              <Text style={styles.submitText}>{t('saveButton', language)}</Text>
+              {(isSubmitting || addCategoryMutation.isPending) && (
+                <ActivityIndicator size="small" color="#ffffff" />
+              )}
+              <Text style={styles.submitText}>
+                {isSubmitting || addCategoryMutation.isPending
+                  ? language === 'zh'
+                    ? '正在保存...'
+                    : 'Saving...'
+                  : t('saveButton', language)}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

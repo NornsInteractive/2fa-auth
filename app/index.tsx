@@ -15,6 +15,7 @@ import { CategoryChips } from '../src/components/common/CategoryChips';
 import { AddTokenModal } from '../src/components/token/AddTokenModal';
 import { AddCategoryModal } from '../src/components/category/AddCategoryModal';
 import { TokenDetailModal } from '../src/components/token/TokenDetailModal';
+import { ImportExportModal } from '../src/components/common/ImportExportModal';
 import { Icon } from '../src/components/common/Icon';
 import { Token } from '../src/types/token';
 
@@ -42,6 +43,7 @@ export default function HomeScreen() {
 
   const [addTokenVisible, setAddTokenVisible] = useState(false);
   const [addCategoryVisible, setAddCategoryVisible] = useState(false);
+  const [importExportVisible, setImportExportVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedDetailToken, setSelectedDetailToken] = useState<Token | null>(null);
 
@@ -113,8 +115,11 @@ export default function HomeScreen() {
 
         {/* Main Content Area */}
         <View style={styles.mainContentWrapper}>
-          {/* Header with Search and Add Token Button */}
-          <FortressHeader onOpenAddModal={() => setAddTokenVisible(true)} />
+          {/* Header with Search, Refresh, Import/Export, and Add Token Button */}
+          <FortressHeader
+            onOpenAddModal={() => setAddTokenVisible(true)}
+            onOpenImportExport={() => setImportExportVisible(true)}
+          />
 
           <ScrollView
             style={styles.scrollArea}
@@ -240,6 +245,12 @@ export default function HomeScreen() {
       <AddCategoryModal
         visible={addCategoryVisible}
         onClose={() => setAddCategoryVisible(false)}
+      />
+
+      {/* Import & Export Modal */}
+      <ImportExportModal
+        visible={importExportVisible}
+        onClose={() => setImportExportVisible(false)}
       />
 
       {/* Token Detail Modal (Modal view on click) */}

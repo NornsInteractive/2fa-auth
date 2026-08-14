@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Modal, useWindowDimensions, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useProviderStore } from '../src/store/useProviderStore';
 import { useTokenStore } from '../src/store/useTokenStore';
@@ -86,34 +86,51 @@ export default function ProvidersScreen() {
     return counts;
   }, [tokens]);
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleCreateProvider = async () => {
+    if (isSubmitting) return;
     if (!newProviderName.trim()) {
       showToast(language === 'zh' ? '请输入提供商名称' : 'Please enter provider name', 'error');
       return;
     }
 
-    await addProvider({
-      name: newProviderName.trim(),
-      icon: selectedIcon,
-      color: selectedColor,
-    });
+    try {
+      setIsSubmitting(true);
+      await addProvider({
+        name: newProviderName.trim(),
+        icon: selectedIcon,
+        color: selectedColor,
+      });
 
-    showToast(
-      language === 'zh' ? `已添加提供商 "${newProviderName}"` : `Provider "${newProviderName}" added`,
-      'check_circle'
-    );
-    setNewProviderName('');
-    setAddModalVisible(false);
+      showToast(
+        language === 'zh' ? `已添加提供商 "${newProviderName}"` : `Provider "${newProviderName}" added`,
+        'check_circle'
+      );
+      setNewProviderName('');
+      setAddModalVisible(false);
+    } catch (_) {
+      showToast('添加提供商失败', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return;
-    await deleteProvider(deleteTarget.id);
-    showToast(
-      language === 'zh' ? `已删除提供商 "${deleteTarget.name}"` : `Provider "${deleteTarget.name}" deleted`,
-      'delete'
-    );
-    setDeleteTarget(null);
+    if (isSubmitting || !deleteTarget) return;
+    try {
+      setIsSubmitting(true);
+      await deleteProvider(deleteTarget.id);
+      showToast(
+        language === 'zh' ? `已删除提供商 "${deleteTarget.name}"` : `Provider "${deleteTarget.name}" deleted`,
+        'delete'
+      );
+      setDeleteTarget(null);
+    } catch (_) {
+      showToast('删除提供商失败', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -376,10 +393,27 @@ export default function ProvidersScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleCreateProvider}
-                style={[styles.saveBtn, { backgroundColor: palette.primary }]}
+                disabled={isSubmitting}
+                style={[
+                  styles.saveBtn,
+                  {
+                    backgroundColor: palette.primary,
+                    opacity: isSubmitting ? 0.7 : 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                  },
+                ]}
               >
+                {isSubmitting && <ActivityIndicator size="small" color="#ffffff" />}
                 <Text style={styles.saveBtnText}>
-                  {language === 'zh' ? '保存并创建' : 'Save'}
+                  {isSubmitting
+                    ? language === 'zh'
+                      ? '正在保存...'
+                      : 'Saving...'
+                    : language === 'zh'
+                    ? '保存并创建'
+                    : 'Save'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -425,10 +459,29 @@ export default function ProvidersScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleDeleteConfirm}
-                style={[styles.confirmDeleteBtn, { backgroundColor: palette.error, flex: 1 }]}
+                disabled={isSubmitting}
+                style={[
+                  styles.confirmDeleteBtn,
+                  {
+                    backgroundColor: palette.error,
+                    opacity: isSubmitting ? 0.7 : 1,
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                  },
+                ]}
               >
+                {isSubmitting && <ActivityIndicator size="small" color="#ffffff" />}
                 <Text style={styles.confirmDeleteBtnText}>
-                  {language === 'zh' ? '确认删除' : 'Delete'}
+                  {isSubmitting
+                    ? language === 'zh'
+                      ? '正在删除...'
+                      : 'Deleting...'
+                    : language === 'zh'
+                    ? '确认删除'
+                    : 'Delete'}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useSettingsStore } from '../../src/store/useSettingsStore';
@@ -12,6 +12,10 @@ import { useToast } from '../../src/components/common/Toast';
 export default function RegisterScreen() {
   const router = useRouter();
   const { showToast } = useToast();
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLocked = useAuthStore((s) => s.isLocked);
+  const isAuthReady = useAuthStore((s) => s.isAuthReady);
   const register = useAuthStore((s) => s.register);
 
   const themeMode = useSettingsStore((s) => s.themeMode);
@@ -29,9 +33,17 @@ export default function RegisterScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Auto redirect to homepage if already logged in
+  useEffect(() => {
+    if (isAuthReady && isAuthenticated && user && !isLocked) {
+      router.replace('/');
+    }
+  }, [isAuthReady, isAuthenticated, user, isLocked]);
+
   const pwdStrength = calculatePasswordStrength(password);
 
   const handleRegister = async () => {
+    if (loading) return;
     if (!name.trim()) {
       setError(t('fullNamePlaceholder', language));
       return;
@@ -52,14 +64,18 @@ export default function RegisterScreen() {
     setLoading(true);
     setError('');
 
-    const res = await register(name, email, password);
-    setLoading(false);
-
-    if (res.success) {
-      showToast('保险库创建成功，已安全解锁！', 'shield_lock');
-      router.replace('/');
-    } else {
-      setError(res.error || 'Registration failed');
+    try {
+      const res = await register(name, email, password);
+      if (res.success) {
+        showToast('保险库创建成功，已安全解锁！', 'shield_lock');
+        router.replace('/');
+      } else {
+        setError(res.error || '注册失败，请稍后重试');
+      }
+    } catch (e: any) {
+      setError(e.message || '注册异常');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -255,11 +271,26 @@ export default function RegisterScreen() {
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={handleRegister}
-                style={[styles.createButton, { backgroundColor: palette.primary }]}
+                style={[
+                  styles.createButton,
+                  {
+                    backgroundColor: palette.primary,
+                    opacity: loading ? 0.7 : 1,
+                  },
+                ]}
                 disabled={loading}
               >
-                <Text style={styles.createButtonText}>{t('createAccount', language)}</Text>
-                <Icon name="arrow_forward" size={18} color="#ffffff" />
+                {loading ? (
+                  <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                ) : null}
+                <Text style={styles.createButtonText}>
+                  {loading
+                    ? language === 'zh'
+                      ? '正在创建保险库...'
+                      : 'Creating Vault...'
+                    : t('createAccount', language)}
+                </Text>
+                {!loading && <Icon name="arrow_forward" size={18} color="#ffffff" />}
               </TouchableOpacity>
             </View>
 

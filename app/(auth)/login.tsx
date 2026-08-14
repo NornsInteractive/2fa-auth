@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../src/store/useAuthStore';
 import { useSettingsStore } from '../../src/store/useSettingsStore';
@@ -11,6 +11,10 @@ import { useToast } from '../../src/components/common/Toast';
 export default function LoginScreen() {
   const router = useRouter();
   const { showToast } = useToast();
+  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLocked = useAuthStore((s) => s.isLocked);
+  const isAuthReady = useAuthStore((s) => s.isAuthReady);
   const login = useAuthStore((s) => s.login);
   const biometricLogin = useAuthStore((s) => s.biometricLogin);
 
@@ -29,6 +33,13 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Auto redirect to homepage if already logged in
+  useEffect(() => {
+    if (isAuthReady && isAuthenticated && user && !isLocked) {
+      router.replace('/');
+    }
+  }, [isAuthReady, isAuthenticated, user, isLocked]);
+
   // Check server domain setup only for Native mobile APK (Web uses relative server path)
   useEffect(() => {
     if (Platform.OS !== 'web' && !serverConfigured) {
@@ -37,6 +48,7 @@ export default function LoginScreen() {
   }, [serverConfigured]);
 
   const handleSignIn = async () => {
+    if (loading) return;
     if (!email.trim() || !password) {
       setError(language === 'zh' ? '请输入邮箱与主密码' : 'Please enter email and master password');
       return;
@@ -45,14 +57,18 @@ export default function LoginScreen() {
     setLoading(true);
     setError('');
 
-    const res = await login(email, password);
-    setLoading(false);
-
-    if (res.success) {
-      showToast(t('welcomeBack', language), 'shield_lock');
-      router.replace('/');
-    } else {
-      setError(res.error || t('loginFailed', language));
+    try {
+      const res = await login(email, password);
+      if (res.success) {
+        showToast(t('welcomeBack', language), 'shield_lock');
+        router.replace('/');
+      } else {
+        setError(res.error || t('loginFailed', language));
+      }
+    } catch (e: any) {
+      setError(e.message || '登录异常');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -183,11 +199,26 @@ export default function LoginScreen() {
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={handleSignIn}
-                style={[styles.signInButton, { backgroundColor: palette.primary }]}
+                style={[
+                  styles.signInButton,
+                  {
+                    backgroundColor: palette.primary,
+                    opacity: loading ? 0.7 : 1,
+                  },
+                ]}
                 disabled={loading}
               >
-                <Text style={styles.signInButtonText}>{t('signIn', language)}</Text>
-                <Icon name="arrow_forward" size={18} color="#ffffff" />
+                {loading ? (
+                  <ActivityIndicator size="small" color="#ffffff" style={{ marginRight: 8 }} />
+                ) : null}
+                <Text style={styles.signInButtonText}>
+                  {loading
+                    ? language === 'zh'
+                      ? '正在登录...'
+                      : 'Signing In...'
+                    : t('signIn', language)}
+                </Text>
+                {!loading && <Icon name="arrow_forward" size={18} color="#ffffff" />}
               </TouchableOpacity>
 
               {/* Or Divider */}

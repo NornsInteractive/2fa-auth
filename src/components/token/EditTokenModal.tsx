@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { CustomField, Token } from '../../types/token';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useTokenStore } from '../../store/useTokenStore';
@@ -72,25 +72,35 @@ export const EditTokenModal: React.FC<EditTokenModalProps> = ({ visible, token, 
     setCustomFields(customFields.filter((f) => f.id !== id));
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSave = async () => {
+    if (isSubmitting) return;
     if (!issuer.trim() || !accountName.trim()) return;
 
     const backupCodes = backupCodesText.trim() ? [backupCodesText.trim()] : [];
 
     const validCustomFields = customFields.filter((f) => f.key.trim() && f.value.trim());
 
-    await updateToken(token.id, {
-      issuer: issuer.trim(),
-      iconType,
-      accountName: accountName.trim(),
-      categoryId,
-      backupCodes,
-      notes: notes.trim(),
-      customFields: validCustomFields,
-    });
+    try {
+      setIsSubmitting(true);
+      await updateToken(token.id, {
+        issuer: issuer.trim(),
+        iconType,
+        accountName: accountName.trim(),
+        categoryId,
+        backupCodes,
+        notes: notes.trim(),
+        customFields: validCustomFields,
+      });
 
-    showToast(t('tokenUpdatedSuccess', language), 'check_circle');
-    onClose();
+      showToast(t('tokenUpdatedSuccess', language), 'check_circle');
+      onClose();
+    } catch (_) {
+      showToast('更新失败，请重试', 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -295,9 +305,26 @@ export const EditTokenModal: React.FC<EditTokenModalProps> = ({ visible, token, 
 
             <TouchableOpacity
               onPress={handleSave}
-              style={[styles.saveBtn, { backgroundColor: palette.primary }]}
+              disabled={isSubmitting}
+              style={[
+                styles.saveBtn,
+                {
+                  backgroundColor: palette.primary,
+                  opacity: isSubmitting ? 0.7 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                },
+              ]}
             >
-              <Text style={styles.saveText}>{t('saveButton', language)}</Text>
+              {isSubmitting && <ActivityIndicator size="small" color="#ffffff" />}
+              <Text style={styles.saveText}>
+                {isSubmitting
+                  ? language === 'zh'
+                    ? '正在保存...'
+                    : 'Saving...'
+                  : t('saveButton', language)}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

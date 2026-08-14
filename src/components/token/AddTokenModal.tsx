@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Modal, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
 import { useCategoryStore } from '../../store/useCategoryStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useAddTokenMutation } from '../../api/hooks';
@@ -83,7 +83,11 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
     setCustomFields(customFields.filter((f) => f.id !== id));
   };
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleSubmit = async () => {
+    if (isSubmitting || addTokenMutation.isPending) return;
+
     if (!issuer.trim()) {
       setErrorMessage(t('issuerPlaceholder', language));
       return;
@@ -104,6 +108,7 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
     const validCustomFields = customFields.filter((f) => f.key.trim() && f.value.trim());
 
     try {
+      setIsSubmitting(true);
       await addTokenMutation.mutateAsync({
         issuer: issuer.trim(),
         accountName: accountName.trim(),
@@ -123,6 +128,8 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
       onClose();
     } catch (e: any) {
       setErrorMessage(e.message || 'Failed to add token');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -493,9 +500,28 @@ export const AddTokenModal: React.FC<AddTokenModalProps> = ({ visible, onClose }
 
             <TouchableOpacity
               onPress={handleSubmit}
-              style={[styles.submitBtn, { backgroundColor: palette.primary }]}
+              disabled={isSubmitting || addTokenMutation.isPending}
+              style={[
+                styles.submitBtn,
+                {
+                  backgroundColor: palette.primary,
+                  opacity: isSubmitting || addTokenMutation.isPending ? 0.7 : 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                },
+              ]}
             >
-              <Text style={styles.submitBtnText}>{t('saveButton', language)}</Text>
+              {isSubmitting || addTokenMutation.isPending ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : null}
+              <Text style={styles.submitBtnText}>
+                {isSubmitting || addTokenMutation.isPending
+                  ? language === 'zh'
+                    ? '正在保存...'
+                    : 'Saving...'
+                  : t('saveButton', language)}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

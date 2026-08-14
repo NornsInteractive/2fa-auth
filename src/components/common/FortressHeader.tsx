@@ -11,9 +11,10 @@ import { GitHubIcon } from './GitHubIcon';
 
 interface FortressHeaderProps {
   onOpenAddModal?: () => void;
+  onOpenImportExport?: () => void;
 }
 
-export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }) => {
+export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, onOpenImportExport }) => {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const lockVault = useAuthStore((s) => s.lockVault);
@@ -139,7 +140,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
         </View>
       </View>
 
-      {/* Search Input Bar + Refresh List + Add Token Button */}
+      {/* Search Input Bar + Refresh List + Import/Export + Add Token Button */}
       <View style={styles.searchBarRow}>
         <View
           style={[
@@ -166,7 +167,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
           )}
         </View>
 
-        {/* Refresh List Button next to search input */}
+        {/* Refresh List Button */}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={refreshTokens}
@@ -189,7 +190,27 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
           </Text>
         </TouchableOpacity>
 
-        {/* Add Token Button next to search input */}
+        {/* Import & Export Button */}
+        {onOpenImportExport && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onOpenImportExport}
+            style={[
+              styles.refreshListBtn,
+              {
+                backgroundColor: palette.surfaceContainerLow,
+                borderColor: palette.outlineVariant,
+              },
+            ]}
+          >
+            <Icon name="import_export" size={16} color={palette.onSurface} />
+            <Text style={[styles.refreshListBtnText, { color: palette.onSurface }]}>
+              {language === 'zh' ? '导入/导出' : 'Backup'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Add Token Button */}
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={onOpenAddModal}
