@@ -46,14 +46,103 @@ app.get('/api/health', (c) => {
 });
 
 // -------------------------------------------------------------
+// AES-GCM Encrypted Transmission Helpers
+// -------------------------------------------------------------
+
+async function getCryptoKey(secretStr = 'fortress_payload_secret_2026_v1'): Promise<CryptoKey> {
+  const enc = new TextEncoder();
+  const keyData = enc.encode(secretStr);
+  const hash = await crypto.subtle.digest('SHA-256', keyData);
+  return await crypto.subtle.importKey('raw', hash, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+function uint8ToBase64(u8: Uint8Array): string {
+  let binary = '';
+  const len = u8.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(u8[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function encryptPayload(data: any): Promise<any> {
+  if (data === null || data === undefined) return data;
+  try {
+    const key = await getCryptoKey();
+    const jsonStr = JSON.stringify(data);
+    const enc = new TextEncoder();
+    const encoded = enc.encode(jsonStr);
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv as any },
+      key,
+      encoded
+    );
+
+    return {
+      payload: uint8ToBase64(new Uint8Array(encryptedBuffer)),
+      iv: uint8ToBase64(iv),
+      encrypted: true,
+    };
+  } catch (err) {
+    return data;
+  }
+}
+
+async function decryptPayload(envelope: any): Promise<any> {
+  if (!envelope || typeof envelope !== 'object' || !envelope.encrypted || !envelope.payload || !envelope.iv) {
+    return envelope;
+  }
+
+  try {
+    const key = await getCryptoKey();
+    const iv = base64ToUint8(envelope.iv);
+    const encryptedBytes = base64ToUint8(envelope.payload);
+
+    const decryptedBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv as any },
+      key,
+      encryptedBytes as any
+    );
+
+    const dec = new TextDecoder();
+    const jsonStr = dec.decode(decryptedBuffer);
+    return JSON.parse(jsonStr);
+  } catch (err) {
+    return envelope;
+  }
+}
+
+async function jsonEncrypted(c: any, data: any, status = 200) {
+  const enc = await encryptPayload(data);
+  return c.json(enc, status);
+}
+
+async function getReqBodyDecrypted(c: any) {
+  const raw = await c.req.json().catch(() => ({}));
+  return await decryptPayload(raw);
+}
+
+// -------------------------------------------------------------
 // Auth Endpoints (Multi-user registration & login with isolation)
 // -------------------------------------------------------------
 
 app.post('/api/auth/register', async (c) => {
   try {
-    const { name, email, password } = await c.req.json();
+    const { name, email, password } = await getReqBodyDecrypted(c);
     if (!email || !password || !name) {
-      return c.json({ error: 'Name, email, and password are required' }, 400);
+      return jsonEncrypted(c, { error: 'Name, email, and password are required' }, 400);
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -103,17 +192,17 @@ app.post('/api/auth/register', async (c) => {
       createdAt: new Date().toISOString(),
     };
 
-    return c.json({ user, token: `jwt_${userId}_${Date.now()}` }, 201);
+    return jsonEncrypted(c, { user, token: `jwt_${userId}_${Date.now()}` }, 201);
   } catch (err: any) {
-    return c.json({ error: err.message || 'Registration failed' }, 500);
+    return jsonEncrypted(c, { error: err.message || 'Registration failed' }, 500);
   }
 });
 
 app.post('/api/auth/login', async (c) => {
   try {
-    const { email, password } = await c.req.json();
+    const { email, password } = await getReqBodyDecrypted(c);
     if (!email || !password) {
-      return c.json({ error: 'Email and password are required' }, 400);
+      return jsonEncrypted(c, { error: 'Email and password are required' }, 400);
     }
 
     const cleanEmail = email.toLowerCase().trim();
@@ -124,14 +213,14 @@ app.post('/api/auth/login', async (c) => {
         .first();
 
       if (!userRow) {
-        return c.json({ error: 'User not found' }, 404);
+        return jsonEncrypted(c, { error: 'User not found' }, 404);
       }
 
       const hashPrimary = await hashPassword(password);
       const hashLegacy = await hashPasswordLegacy(password);
 
       if (userRow.password_hash !== hashPrimary && userRow.password_hash !== hashLegacy) {
-        return c.json({ error: 'Invalid password' }, 401);
+        return jsonEncrypted(c, { error: 'Invalid password' }, 401);
       }
 
       const user = {
@@ -143,7 +232,7 @@ app.post('/api/auth/login', async (c) => {
         createdAt: userRow.created_at,
       };
 
-      return c.json({ user, token: `jwt_${user.id}_${Date.now()}` });
+      return jsonEncrypted(c, { user, token: `jwt_${userRow.id}_${Date.now()}` });
     }
 
     // Fallback if DB not connected
@@ -171,7 +260,7 @@ app.get('/api/categories', async (c) => {
   try {
     const userId = c.req.query('userId');
     if (!c.env.DB) {
-      return c.json([]);
+      return jsonEncrypted(c, []);
     }
 
     let results: any[] = [];
@@ -199,15 +288,15 @@ app.get('/api/categories', async (c) => {
       isDefault: Boolean(row.is_default ?? row.isDefault),
     }));
 
-    return c.json(formatted);
+    return jsonEncrypted(c, formatted);
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
 app.post('/api/categories', async (c) => {
   try {
-    const body = await c.req.json();
+    const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
     const id = `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -232,9 +321,9 @@ app.post('/api/categories', async (c) => {
         .run();
     }
 
-    return c.json({ id, userId, name, slug, icon, color, isDefault: false }, 201);
+    return jsonEncrypted(c, { id, userId, name, slug, icon, color, isDefault: false }, 201);
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
@@ -252,9 +341,9 @@ app.delete('/api/categories/:id', async (c) => {
         await c.env.DB.prepare('DELETE FROM categories WHERE id = ?').bind(id).run();
       }
     }
-    return c.json({ success: true });
+    return jsonEncrypted(c, { success: true });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
@@ -266,7 +355,7 @@ app.get('/api/tokens', async (c) => {
   try {
     const userId = c.req.query('userId');
     if (!c.env.DB || !userId) {
-      return c.json([]);
+      return jsonEncrypted(c, []);
     }
 
     const { results } = await c.env.DB.prepare(
@@ -294,15 +383,15 @@ app.get('/api/tokens', async (c) => {
       updatedAt: row.updated_at || row.updatedAt,
     }));
 
-    return c.json(formatted);
+    return jsonEncrypted(c, formatted);
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
 app.post('/api/tokens', async (c) => {
   try {
-    const body = await c.req.json();
+    const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
     const id = `token_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -358,7 +447,8 @@ app.post('/api/tokens', async (c) => {
         .run();
     }
 
-    return c.json(
+    return jsonEncrypted(
+      c,
       {
         id,
         userId,
@@ -376,14 +466,14 @@ app.post('/api/tokens', async (c) => {
       201
     );
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
 app.put('/api/tokens/:id', async (c) => {
   try {
     const id = c.req.param('id');
-    const body = await c.req.json();
+    const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId');
 
     if (c.env.DB) {
@@ -412,9 +502,9 @@ app.put('/api/tokens/:id', async (c) => {
         )
         .run();
     }
-    return c.json({ success: true, ...body });
+    return jsonEncrypted(c, { success: true, ...body });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
@@ -432,9 +522,9 @@ app.delete('/api/tokens/:id', async (c) => {
         await c.env.DB.prepare('DELETE FROM tokens WHERE id = ?').bind(id).run();
       }
     }
-    return c.json({ success: true });
+    return jsonEncrypted(c, { success: true });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
@@ -511,7 +601,7 @@ app.get('/api/providers', async (c) => {
   try {
     const userId = c.req.query('userId');
     if (!c.env.DB || !userId) {
-      return c.json([]);
+      return jsonEncrypted(c, []);
     }
 
     await initDbTables(c.env.DB);
@@ -533,15 +623,15 @@ app.get('/api/providers', async (c) => {
       isDefault: Boolean(row.is_default ?? row.isDefault),
     }));
 
-    return c.json(formatted);
+    return jsonEncrypted(c, formatted);
   } catch (err: any) {
-    return c.json([]);
+    return jsonEncrypted(c, []);
   }
 });
 
 app.post('/api/providers', async (c) => {
   try {
-    const body = await c.req.json();
+    const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
     const id = `prov_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
@@ -565,9 +655,9 @@ app.post('/api/providers', async (c) => {
         .run();
     }
 
-    return c.json({ id, userId, name, icon, color, isDefault: false }, 201);
+    return jsonEncrypted(c, { id, userId, name, icon, color, isDefault: false }, 201);
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 
@@ -581,9 +671,9 @@ app.delete('/api/providers/:id', async (c) => {
         .bind(id, userId)
         .run();
     }
-    return c.json({ success: true });
+    return jsonEncrypted(c, { success: true });
   } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+    return jsonEncrypted(c, { error: err.message }, 500);
   }
 });
 

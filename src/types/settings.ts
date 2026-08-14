@@ -31,4 +31,5 @@ export interface AppSettings {
   hapticsEnabled: boolean;
   serverUrl: string; // Cloudflare Workers Server URL (e.g. https://mimir-2fa-api.workers.dev)
   serverConfigured: boolean; // Whether the user has configured/confirmed server domain
+  syncIntervalSeconds: number; // Token auto-refresh interval in seconds (0 = off, 10, 30, 60, 300)
 }

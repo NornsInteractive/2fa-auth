@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, ScrollView, Platform, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, ScrollView, Platform, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
@@ -40,6 +40,9 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
     setLanguage(language === 'zh' ? 'en' : 'zh');
   };
 
+  const isRefreshing = useTokenStore((s) => s.isRefreshing);
+  const refreshTokens = useTokenStore((s) => s.refreshTokens);
+
   return (
     <View style={[styles.headerContainer, { backgroundColor: palette.surface, borderColor: palette.surfaceVariant }]}>
       {/* Mobile Brand Top Row */}
@@ -55,6 +58,20 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal }
 
         {/* Action Controls */}
         <View style={styles.headerControls}>
+          {/* Manual Refresh Button */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={refreshTokens}
+            disabled={isRefreshing}
+            style={[styles.iconButton, { backgroundColor: palette.surfaceContainerLow }]}
+            accessibilityLabel="Refresh Token List"
+          >
+            {isRefreshing ? (
+              <ActivityIndicator size="small" color={palette.primary} />
+            ) : (
+              <Icon name="refresh" size={18} color={palette.onSurfaceVariant} />
+            )}
+          </TouchableOpacity>
           {/* Theme Color Picker Button */}
           <TouchableOpacity
             activeOpacity={0.7}

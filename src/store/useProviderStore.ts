@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { Provider, NewProviderInput } from '../types/provider';
 import { storage } from '../utils/storage';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, fetchEncrypted } from '../api/client';
 import { useAuthStore } from './useAuthStore';
 
 export const DEFAULT_PROVIDERS: Provider[] = [
@@ -44,7 +44,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     // Try fetch remote providers
     if (activeUserId) {
       try {
-        const res = await fetch(getApiUrl(`/api/providers?userId=${activeUserId}`));
+        const res = await fetchEncrypted(getApiUrl(`/api/providers?userId=${activeUserId}`));
         if (res.ok) {
           const remoteProviders = await res.json();
           if (Array.isArray(remoteProviders) && remoteProviders.length > 0) {
@@ -81,7 +81,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
 
     // Sync remote
     try {
-      fetch(getApiUrl('/api/providers'), {
+      fetchEncrypted(getApiUrl('/api/providers'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...input, userId }),
@@ -101,7 +101,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     await storage.set(getProviderStorageKey(userId), next);
 
     try {
-      fetch(getApiUrl(`/api/providers/${id}?userId=${userId}`), {
+      fetchEncrypted(getApiUrl(`/api/providers/${id}?userId=${userId}`), {
         method: 'DELETE',
       }).catch(() => {});
     } catch (_) {}

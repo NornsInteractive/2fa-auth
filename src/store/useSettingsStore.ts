@@ -12,6 +12,7 @@ interface SettingsState extends AppSettings {
   setCloudSyncEnabled: (enabled: boolean) => void;
   setPersistSessionOnReload: (enabled: boolean) => void;
   setServerUrl: (url: string) => void;
+  setSyncIntervalSeconds: (seconds: number) => void;
   loadSettings: () => Promise<void>;
 }
 
@@ -37,6 +38,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   hapticsEnabled: true,
   serverUrl: getInitialWebUrl(),
   serverConfigured: isWeb,
+  syncIntervalSeconds: 30,
 
   setLanguage: (language) => {
     set({ language });
@@ -77,6 +79,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     const cleanUrl = serverUrl.trim().replace(/\/+$/, '');
     set({ serverUrl: cleanUrl, serverConfigured: true });
     storage.set(SETTINGS_STORAGE_KEY, { ...get(), serverUrl: cleanUrl, serverConfigured: true });
+  },
+
+  setSyncIntervalSeconds: (syncIntervalSeconds) => {
+    set({ syncIntervalSeconds });
+    storage.set(SETTINGS_STORAGE_KEY, { ...get(), syncIntervalSeconds });
   },
 
   loadSettings: async () => {

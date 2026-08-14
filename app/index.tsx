@@ -52,6 +52,18 @@ export default function HomeScreen() {
     }
   }, [isAuthReady, isAuthenticated, user]);
 
+  const syncIntervalSeconds = useSettingsStore((s) => s.syncIntervalSeconds);
+  const refreshTokens = useTokenStore((s) => s.refreshTokens);
+
+  // Auto-sync token list periodically based on settings
+  useEffect(() => {
+    if (!isAuthenticated || !syncIntervalSeconds || syncIntervalSeconds <= 0) return;
+    const timer = setInterval(() => {
+      refreshTokens();
+    }, syncIntervalSeconds * 1000);
+    return () => clearInterval(timer);
+  }, [isAuthenticated, syncIntervalSeconds, refreshTokens]);
+
   // Filtered tokens by Category, Provider/Issuer, and Search Query
   const filteredTokens = useMemo(() => {
     return tokens.filter((tok) => {

@@ -40,6 +40,8 @@ export default function SettingsScreen() {
   const persistSessionOnReload = useSettingsStore((s) => s.persistSessionOnReload);
   const setPersistSessionOnReload = useSettingsStore((s) => s.setPersistSessionOnReload);
   const serverUrl = useSettingsStore((s) => s.serverUrl);
+  const syncIntervalSeconds = useSettingsStore((s) => s.syncIntervalSeconds);
+  const setSyncIntervalSeconds = useSettingsStore((s) => s.setSyncIntervalSeconds);
 
   const [clearModalVisible, setClearModalVisible] = useState(false);
 
@@ -51,6 +53,14 @@ export default function SettingsScreen() {
     { label: '5 ' + t('autoLockMinutes', language), value: 5 },
     { label: '15 ' + t('autoLockMinutes', language), value: 15 },
     { label: t('autoLockNever', language), value: 0 },
+  ];
+
+  const syncIntervalOptions = [
+    { label: language === 'zh' ? '10秒' : '10s', value: 10 },
+    { label: language === 'zh' ? '30秒' : '30s', value: 30 },
+    { label: language === 'zh' ? '1分钟' : '1m', value: 60 },
+    { label: language === 'zh' ? '5分钟' : '5m', value: 300 },
+    { label: language === 'zh' ? '关闭' : 'Off', value: 0 },
   ];
 
   const handleResetVault = async () => {
@@ -421,6 +431,47 @@ export default function SettingsScreen() {
                   thumbColor={cloudSyncEnabled ? palette.primary : '#ccc'}
                   trackColor={{ false: '#767577', true: palette.secondaryContainer }}
                 />
+              </View>
+
+              {/* Auto Sync Interval Selector */}
+              <View
+                style={[
+                  styles.cardColumn,
+                  { backgroundColor: palette.surfaceContainer, borderColor: palette.outlineVariant },
+                ]}
+              >
+                <Text style={[styles.rowTitle, { color: palette.onSurface, marginBottom: 10 }]}>
+                  {language === 'zh' ? '密钥列表定时同步频率' : 'Key List Auto-sync Interval'}
+                </Text>
+                <View style={styles.autoLockRow}>
+                  {syncIntervalOptions.map((opt) => {
+                    const isSelected = syncIntervalSeconds === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        onPress={() => setSyncIntervalSeconds(opt.value)}
+                        style={[
+                          styles.autoLockPill,
+                          {
+                            backgroundColor: isSelected
+                              ? palette.primaryContainer
+                              : palette.surfaceContainerLow,
+                            borderColor: isSelected ? palette.primary : palette.outlineVariant,
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.autoLockPillText,
+                            { color: isSelected ? '#ffffff' : palette.onSurface },
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
               {/* Tokens Count */}

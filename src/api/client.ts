@@ -1,8 +1,8 @@
 import { QueryClient } from '@tanstack/react-query';
 import { Token, NewTokenInput } from '../types/token';
 import { Category, NewCategoryInput } from '../types/category';
-
 import { useSettingsStore } from '../store/useSettingsStore';
+import { encryptPayload, decryptPayload } from '../utils/cryptoPayload';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,22 +23,49 @@ export function getApiUrl(path: string): string {
   return cleanPath.startsWith('/api') ? cleanPath : `/api${cleanPath}`;
 }
 
+export async function fetchEncrypted(url: string, options: RequestInit = {}): Promise<Response> {
+  const headers = new Headers(options.headers || {});
+
+  let newBody = options.body;
+  if (options.body && typeof options.body === 'string') {
+    try {
+      const parsed = JSON.parse(options.body);
+      const encrypted = await encryptPayload(parsed);
+      newBody = JSON.stringify(encrypted);
+      headers.set('Content-Type', 'application/json');
+    } catch (_) {}
+  }
+
+  const response = await fetch(url, {
+    ...options,
+    headers,
+    body: newBody,
+  });
+
+  const originalJson = response.json.bind(response);
+  response.json = async () => {
+    const rawData = await originalJson();
+    return await decryptPayload(rawData);
+  };
+
+  return response;
+}
+
 export const api = {
   // Tokens
   async getTokens(): Promise<Token[]> {
     try {
-      const res = await fetch(getApiUrl('/api/tokens'));
+      const res = await fetchEncrypted(getApiUrl('/api/tokens'));
       if (!res.ok) throw new Error('Network response was not ok');
       return await res.json();
     } catch {
-      // Handled by local store fallback
       return [];
     }
   },
 
   async createToken(input: NewTokenInput): Promise<Token> {
     try {
-      const res = await fetch(getApiUrl('/api/tokens'), {
+      const res = await fetchEncrypted(getApiUrl('/api/tokens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
@@ -52,7 +79,7 @@ export const api = {
 
   async deleteToken(id: string): Promise<void> {
     try {
-      await fetch(getApiUrl(`/api/tokens/${id}`), { method: 'DELETE' });
+      await fetchEncrypted(getApiUrl(`/api/tokens/${id}`), { method: 'DELETE' });
     } catch {
       // offline
     }
@@ -61,7 +88,7 @@ export const api = {
   // Categories
   async getCategories(): Promise<Category[]> {
     try {
-      const res = await fetch(getApiUrl('/api/categories'));
+      const res = await fetchEncrypted(getApiUrl('/api/categories'));
       if (!res.ok) throw new Error('Network response was not ok');
       return await res.json();
     } catch {
@@ -71,7 +98,7 @@ export const api = {
 
   async createCategory(input: NewCategoryInput): Promise<Category> {
     try {
-      const res = await fetch(getApiUrl('/api/categories'), {
+      const res = await fetchEncrypted(getApiUrl('/api/categories'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),

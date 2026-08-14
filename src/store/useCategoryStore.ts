@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Category, NewCategoryInput } from '../types/category';
 import { DEFAULT_CATEGORIES } from '../api/mockData';
 import { storage } from '../utils/storage';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, fetchEncrypted } from '../api/client';
 import { useAuthStore } from './useAuthStore';
 
 interface CategoryState {
@@ -45,7 +45,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
     // Sync remote
     try {
-      fetch(getApiUrl('/api/categories'), {
+      fetchEncrypted(getApiUrl('/api/categories'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...input, userId }),
@@ -83,7 +83,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     await storage.set(getCategoryStorageKey(userId), next);
 
     try {
-      fetch(getApiUrl(`/api/categories/${id}?userId=${userId}`), {
+      fetchEncrypted(getApiUrl(`/api/categories/${id}?userId=${userId}`), {
         method: 'DELETE',
       }).catch(() => {});
     } catch (_) {}
@@ -99,7 +99,7 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     // Try fetch remote
     if (activeUserId) {
       try {
-        const res = await fetch(getApiUrl(`/api/categories?userId=${activeUserId}`));
+        const res = await fetchEncrypted(getApiUrl(`/api/categories?userId=${activeUserId}`));
         if (res.ok) {
           const remoteCats = await res.json();
           if (Array.isArray(remoteCats) && remoteCats.length > 0) {

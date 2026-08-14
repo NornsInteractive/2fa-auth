@@ -7,7 +7,7 @@ import { useCategoryStore } from './useCategoryStore';
 import { useProviderStore } from './useProviderStore';
 import { useSettingsStore } from './useSettingsStore';
 
-import { getApiUrl } from '../api/client';
+import { getApiUrl, fetchEncrypted } from '../api/client';
 
 export interface StoredAccount {
   id: string;
@@ -86,7 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Try sync to Cloudflare Workers if online
       try {
-        fetch(getApiUrl('/api/auth/register'), {
+        fetchEncrypted(getApiUrl('/api/auth/register'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: cleanName, email: cleanEmail, password: masterPassword }),
@@ -144,7 +144,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Prioritize remote Cloudflare Worker login if serverUrl is configured
       if (serverUrl && serverUrl.trim().length > 0) {
         try {
-          const res = await fetch(getApiUrl('/api/auth/login'), {
+          const res = await fetchEncrypted(getApiUrl('/api/auth/login'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email: cleanEmail, password: masterPassword }),

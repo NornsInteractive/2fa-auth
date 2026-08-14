@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { NewTokenInput, Token } from '../types/token';
 import { generateBackupCodes, getRemainingSeconds } from '../utils/totp';
 import { storage } from '../utils/storage';
-import { getApiUrl } from '../api/client';
+import { getApiUrl, fetchEncrypted } from '../api/client';
 import { useAuthStore } from './useAuthStore';
 
 interface TokenState {
@@ -12,6 +12,7 @@ interface TokenState {
   selectedProvider: string;
   remainingSeconds: number;
   copiedTokenId: string | null;
+  isRefreshing: boolean;
   setSearchQuery: (query: string) => void;
   setSelectedProvider: (provider: string) => void;
   setRemainingSeconds: (seconds: number) => void;
@@ -21,6 +22,7 @@ interface TokenState {
   deleteToken: (id: string) => Promise<void>;
   getTokenById: (id: string) => Token | undefined;
   loadTokens: (userId?: string) => Promise<void>;
+  refreshTokens: () => Promise<void>;
   resetToDefault: () => Promise<void>;
 }
 
@@ -53,6 +55,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
   selectedProvider: 'all',
   remainingSeconds: getRemainingSeconds(30),
   copiedTokenId: null,
+  isRefreshing: false,
 
   setSearchQuery: (searchQuery: string) => set({ searchQuery }),
   setSelectedProvider: (selectedProvider: string) => set({ selectedProvider }),
@@ -84,7 +87,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Try remote sync to Cloudflare Workers
     try {
-      fetch(getApiUrl('/api/tokens'), {
+      fetchEncrypted(getApiUrl('/api/tokens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newToken, userId }),
@@ -112,7 +115,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Sync remote
     try {
-      fetch(getApiUrl(`/api/tokens/${id}`), {
+      fetchEncrypted(getApiUrl(`/api/tokens/${id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...updates, userId }),
@@ -128,7 +131,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Sync remote
     try {
-      fetch(getApiUrl(`/api/tokens/${id}?userId=${userId}`), {
+      fetchEncrypted(getApiUrl(`/api/tokens/${id}?userId=${userId}`), {
         method: 'DELETE',
       }).catch(() => {});
     } catch (_) {}
@@ -152,7 +155,7 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Try fetch remote tokens from Cloudflare D1
     try {
-      const res = await fetch(getApiUrl(`/api/tokens?userId=${activeUserId}`));
+      const res = await fetchEncrypted(getApiUrl(`/api/tokens?userId=${activeUserId}`));
       if (res.ok) {
         const remoteTokens = await res.json();
         if (Array.isArray(remoteTokens) && remoteTokens.length > 0) {
@@ -163,6 +166,46 @@ export const useTokenStore = create<TokenState>((set, get) => ({
     } catch (_) {}
 
     set({ tokens: (saved || []).map(normalizeToken) });
+  },
+
+  refreshTokens: async () => {
+    const activeUserId = get().currentUserId || useAuthStore.getState().user?.id;
+    if (!activeUserId) return;
+    set({ isRefreshing: true });
+    try {
+      const res = await fetchEncrypted(getApiUrl(`/api/tokens?userId=${activeUserId}`));
+      if (res.ok) {
+        const remoteTokens = await res.json();
+        if (Array.isArray(remoteTokens)) {
+          const normalized = remoteTokens.map(normalizeToken);
+          const current = get().tokens;
+
+          // Check if tokens changed seamlessly
+          const isDifferent =
+            normalized.length !== current.length ||
+            normalized.some((nt, idx) => {
+              const ct = current[idx];
+              return (
+                !ct ||
+                nt.id !== ct.id ||
+                nt.secretKey !== ct.secretKey ||
+                nt.accountName !== ct.accountName ||
+                nt.issuer !== ct.issuer ||
+                nt.categoryId !== ct.categoryId
+              );
+            });
+
+          if (isDifferent) {
+            set({ tokens: normalized });
+            const storageKey = getTokenStorageKey(activeUserId);
+            await storage.set(storageKey, normalized);
+          }
+        }
+      }
+    } catch (_) {
+    } finally {
+      set({ isRefreshing: false });
+    }
   },
 
   resetToDefault: async () => {
