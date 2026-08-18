@@ -3,6 +3,9 @@ main = "src/worker/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+# 保持在 Cloudflare Dashboard 控制台设置的环境变量与 Secrets 永不被代码部署覆盖
+keep_vars = true
+
 [assets]
 directory = "./dist"
 binding = "ASSETS"
@@ -11,9 +14,3 @@ binding = "ASSETS"
 binding = "DB"
 database_name = "2fa-db"
 database_id = "5741847e-0858-4b18-a63f-4c68c115b22a"
-
-[vars]
-ENVIRONMENT = "production"
-JWT_SECRET = "fortress-secure-jwt-vault-token-2026"
-ADMIN_EMAIL = "admin@mimir.app"
-ADMIN_PASSWORD = "admin"

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Modal, ScrollView, Platform, Linking, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -29,6 +29,22 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
   const setLanguage = useSettingsStore((s) => s.setLanguage);
 
   const [colorPickerVisible, setColorPickerVisible] = useState(false);
+  const [remoteApkUrl, setRemoteApkUrl] = useState<string>(
+    (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || process.env.EXPO_PUBLIC_APK_URL || '').trim()
+  );
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && !remoteApkUrl) {
+      fetch('/api/config')
+        .then((r) => r.json())
+        .then((res: any) => {
+          if (res?.data?.apkDownloadUrl) {
+            setRemoteApkUrl(res.data.apkDownloadUrl.trim());
+          }
+        })
+        .catch(() => {});
+    }
+  }, [remoteApkUrl]);
 
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
@@ -95,14 +111,13 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
             </Text>
           </TouchableOpacity>
 
-          {/* Web APK Download Button (Only displayed if EXPO_PUBLIC_APK_DOWNLOAD_URL is configured) */}
-          {Platform.OS === 'web' && (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || '').trim().length > 0 && (
+          {/* Web APK Download Button (Only displayed if remoteApkUrl is configured) */}
+          {Platform.OS === 'web' && !!remoteApkUrl && (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => {
-                const apkUrl = (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || '').trim();
-                if (apkUrl && typeof window !== 'undefined') {
-                  window.open(apkUrl, '_blank');
+                if (remoteApkUrl && typeof window !== 'undefined') {
+                  window.open(remoteApkUrl, '_blank');
                 }
               }}
               style={[

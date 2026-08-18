@@ -47,6 +47,24 @@ app.get('/api/health', (c) => {
   });
 });
 
+// Public server configuration endpoint (exposing configured download URLs and runtime flags)
+app.get('/api/config', (c) => {
+  const envObj = (c.env || {}) as any;
+  const apkDownloadUrl =
+    envObj.EXPO_PUBLIC_APK_URL ||
+    envObj.EXPO_PUBLIC_APK_DOWNLOAD_URL ||
+    envObj.APK_DOWNLOAD_URL ||
+    '';
+
+  return c.json({
+    code: 0,
+    data: {
+      apkDownloadUrl,
+      environment: envObj.ENVIRONMENT || 'production',
+    },
+  });
+});
+
 // -------------------------------------------------------------
 // AES-GCM Encrypted Transmission Helpers
 // -------------------------------------------------------------
