@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, useWindowDimensions, Modal, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, useWindowDimensions, Modal, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -11,6 +11,7 @@ import { useToast } from '../src/components/common/Toast';
 import { FortressSidebar } from '../src/components/common/FortressSidebar';
 import { FortressBottomNav } from '../src/components/common/FortressBottomNav';
 import { UpdateModal } from '../src/components/common/UpdateModal';
+import { ApkDownloadModal } from '../src/components/common/ApkDownloadModal';
 import { checkAppUpdate, UpdateInfo, APP_VERSION_NAME, APP_VERSION_CODE } from '../src/utils/updateChecker';
 import { ThemeColorKey, ThemeMode, Language } from '../src/types/settings';
 
@@ -49,6 +50,24 @@ export default function SettingsScreen() {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateModalVisible, setUpdateModalVisible] = useState(false);
   const [detectedUpdateInfo, setDetectedUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  const [apkModalVisible, setApkModalVisible] = useState(false);
+  const [remoteApkUrl, setRemoteApkUrl] = useState<string>(
+    (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || process.env.EXPO_PUBLIC_APK_URL || '').trim()
+  );
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && !remoteApkUrl) {
+      fetch('/api/config')
+        .then((r) => r.json())
+        .then((res: any) => {
+          if (res?.data?.apkDownloadUrl) {
+            setRemoteApkUrl(res.data.apkDownloadUrl.trim());
+          }
+        })
+        .catch(() => {});
+    }
+  }, [remoteApkUrl]);
 
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
@@ -595,6 +614,32 @@ export default function SettingsScreen() {
                 )}
               </TouchableOpacity>
 
+              {/* Download Android APK (QR Code / Direct Download) */}
+              {Platform.OS === 'web' && !!remoteApkUrl && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setApkModalVisible(true)}
+                  style={[
+                    styles.cardRow,
+                    styles.clickableRow,
+                    { backgroundColor: palette.surfaceContainer, borderColor: palette.outlineVariant },
+                  ]}
+                >
+                  <View style={styles.rowLeftGroup}>
+                    <Icon name="android" size={20} color={palette.primary} fill />
+                    <View style={{ gap: 2 }}>
+                      <Text style={[styles.rowTitle, { color: palette.onSurface }]}>
+                        {language === 'zh' ? '下载 Android 客户端' : 'Download Android App'}
+                      </Text>
+                      <Text style={[styles.rowSub, { color: palette.onSurfaceVariant }]}>
+                        {language === 'zh' ? '扫码直接安装或下载 APK 安装包' : 'Scan QR code or download APK'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Icon name="chevron_right" size={20} color={palette.onSurfaceVariant} />
+                </TouchableOpacity>
+              )}
+
               {/* Reset Vault Button */}
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -640,6 +685,15 @@ export default function SettingsScreen() {
         visible={updateModalVisible}
         updateInfo={detectedUpdateInfo}
         onClose={() => setUpdateModalVisible(false)}
+      />
+
+      {/* APK Download & QR Scan Modal */}
+      <ApkDownloadModal
+        visible={apkModalVisible}
+        apkUrl={remoteApkUrl}
+        versionName="1.0.0"
+        fileSize="175.6 MB"
+        onClose={() => setApkModalVisible(false)}
       />
 
       {/* Clear Vault Confirmation Modal */}

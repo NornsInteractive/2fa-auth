@@ -8,6 +8,7 @@ import { getColorPalette, THEME_COLOR_OPTIONS } from '../../theme/colors';
 import { t } from '../../utils/i18n';
 import { Icon } from './Icon';
 import { GitHubIcon } from './GitHubIcon';
+import { ApkDownloadModal } from './ApkDownloadModal';
 
 interface FortressHeaderProps {
   onOpenAddModal?: () => void;
@@ -29,6 +30,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
   const setLanguage = useSettingsStore((s) => s.setLanguage);
 
   const [colorPickerVisible, setColorPickerVisible] = useState(false);
+  const [apkModalVisible, setApkModalVisible] = useState(false);
   const [remoteApkUrl, setRemoteApkUrl] = useState<string>(
     (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || process.env.EXPO_PUBLIC_APK_URL || '').trim()
   );
@@ -115,11 +117,7 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
           {Platform.OS === 'web' && !!remoteApkUrl && (
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={() => {
-                if (remoteApkUrl && typeof window !== 'undefined') {
-                  window.open(remoteApkUrl, '_blank');
-                }
-              }}
+              onPress={() => setApkModalVisible(true)}
               style={[
                 styles.iconButton,
                 {
@@ -340,6 +338,15 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* APK Download Modal with QR Code and Direct Download */}
+      <ApkDownloadModal
+        visible={apkModalVisible}
+        apkUrl={remoteApkUrl}
+        versionName="1.0.0"
+        fileSize="175.6 MB"
+        onClose={() => setApkModalVisible(false)}
+      />
     </View>
   );
 };
