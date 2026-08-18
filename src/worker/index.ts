@@ -231,11 +231,6 @@ app.post('/api/auth/login', async (c) => {
 
     // 1. Check if trying to log in as administrator
     if (cleanEmail === adminEmail) {
-      const isPasswordMatch = password === adminPassword;
-      if (!isPasswordMatch) {
-        return jsonEncrypted(c, { error: '管理员主密码错误，请重新输入' }, 401);
-      }
-
       if (c.env.DB) {
         await initDbTables(c.env.DB);
         // Ensure admin_root exists in users table
@@ -244,6 +239,30 @@ app.post('/api/auth/login', async (c) => {
         )
           .bind('admin_root', 'Administrator', adminEmail, 'admin_hash_placeholder', 'admin', 'active')
           .run().catch(() => {});
+      }
+
+      // Check if admin has a customized password in the database
+      let isPasswordMatch = false;
+      if (c.env.DB) {
+        const adminRow = await c.env.DB.prepare(
+          'SELECT password_hash FROM users WHERE id = ? OR email = ?'
+        )
+          .bind('admin_root', adminEmail)
+          .first().catch(() => null);
+
+        if (adminRow && adminRow.password_hash && adminRow.password_hash !== 'admin_hash_placeholder') {
+          const inputHash = await hashPassword(password);
+          const legacyInputHash = await hashPasswordLegacy(password);
+          isPasswordMatch = adminRow.password_hash === inputHash || adminRow.password_hash === legacyInputHash || password === adminPassword;
+        } else {
+          isPasswordMatch = password === adminPassword;
+        }
+      } else {
+        isPasswordMatch = password === adminPassword;
+      }
+
+      if (!isPasswordMatch) {
+        return jsonEncrypted(c, { error: '管理员主密码错误，请重新输入' }, 401);
       }
 
       const adminUser = {
@@ -515,7 +534,7 @@ app.post('/api/categories', async (c) => {
     const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
-    const id = `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = body.id || body._id || `cat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const name = body.name || 'New Category';
     const slug = name.toLowerCase().replace(/\s+/g, '-');
     const icon = body.icon || 'folder';
@@ -531,7 +550,7 @@ app.post('/api/categories', async (c) => {
         .run().catch(() => {});
 
       await c.env.DB.prepare(
-        `INSERT INTO categories (id, user_id, name, slug, icon, color, is_default) VALUES (?, ?, ?, ?, ?, ?, 0)`
+        `INSERT OR REPLACE INTO categories (id, user_id, name, slug, icon, color, is_default) VALUES (?, ?, ?, ?, ?, ?, 0)`
       )
         .bind(id, userId, name, slug, icon, color)
         .run();
@@ -610,7 +629,7 @@ app.post('/api/tokens', async (c) => {
     const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
-    const id = `token_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const id = body.id || body._id || `token_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const rawCategoryId = body.categoryId || body.category_id || 'all';
     const issuer = body.issuer || 'Unknown Service';
     const accountName = body.accountName || body.account_name || '';
@@ -643,7 +662,7 @@ app.post('/api/tokens', async (c) => {
       }
 
       await c.env.DB.prepare(
-        `INSERT INTO tokens (id, user_id, category_id, issuer, account_name, secret_key, algorithm, digits, period, icon_type, notes, backup_codes)
+        `INSERT OR REPLACE INTO tokens (id, user_id, category_id, issuer, account_name, secret_key, algorithm, digits, period, icon_type, notes, backup_codes)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
         .bind(
@@ -704,19 +723,56 @@ app.put('/api/tokens/:id', async (c) => {
         }
       }
 
-      await c.env.DB.prepare(
-        `UPDATE tokens SET issuer = ?, account_name = ?, category_id = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE id = ? ${userId ? 'AND user_id = ?' : ''}`
-      )
-        .bind(
-          body.issuer,
-          body.accountName,
-          validCategoryId,
-          body.notes,
-          id,
-          ...(userId ? [userId] : [])
+      // Fetch existing token to preserve unchanged fields
+      const existing = await c.env.DB.prepare('SELECT * FROM tokens WHERE id = ?')
+        .bind(id)
+        .first().catch(() => null);
+
+      if (existing) {
+        const issuer = body.issuer !== undefined ? body.issuer : existing.issuer;
+        const accountName = body.accountName !== undefined ? body.accountName : (body.account_name !== undefined ? body.account_name : existing.account_name);
+        const secretKey = body.secretKey !== undefined ? body.secretKey : (body.secret_key !== undefined ? body.secret_key : existing.secret_key);
+        const iconType = body.iconType !== undefined ? body.iconType : (body.icon_type !== undefined ? body.icon_type : existing.icon_type);
+        const notes = body.notes !== undefined ? body.notes : existing.notes;
+        const backupCodes = body.backupCodes !== undefined 
+          ? JSON.stringify(body.backupCodes)
+          : (body.backup_codes !== undefined ? JSON.stringify(body.backup_codes) : existing.backup_codes);
+        const algorithm = body.algorithm !== undefined ? body.algorithm : existing.algorithm;
+        const digits = body.digits !== undefined ? body.digits : existing.digits;
+        const period = body.period !== undefined ? body.period : existing.period;
+        const categoryId = body.categoryId !== undefined ? validCategoryId : existing.category_id;
+
+        await c.env.DB.prepare(
+          `UPDATE tokens SET 
+             issuer = ?, 
+             account_name = ?, 
+             secret_key = ?, 
+             icon_type = ?, 
+             category_id = ?, 
+             notes = ?, 
+             backup_codes = ?, 
+             algorithm = ?, 
+             digits = ?, 
+             period = ?, 
+             updated_at = CURRENT_TIMESTAMP
+           WHERE id = ? ${userId ? 'AND user_id = ?' : ''}`
         )
-        .run();
+          .bind(
+            issuer,
+            accountName,
+            secretKey,
+            iconType,
+            categoryId,
+            notes,
+            backupCodes,
+            algorithm,
+            digits,
+            period,
+            id,
+            ...(userId ? [userId] : [])
+          )
+          .run();
+      }
     }
     return jsonEncrypted(c, { success: true, ...body });
   } catch (err: any) {
@@ -868,7 +924,7 @@ app.post('/api/providers', async (c) => {
     const body = await getReqBodyDecrypted(c);
     const userId = body.userId || body.user_id || c.req.query('userId') || 'usr_guest';
 
-    const id = `prov_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const id = body.id || body._id || `prov_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const name = body.name || 'New Provider';
     const icon = body.icon || 'shield';
     const color = body.color || '#005ac1';
@@ -883,7 +939,7 @@ app.post('/api/providers', async (c) => {
         .run().catch(() => {});
 
       await c.env.DB.prepare(
-        'INSERT INTO providers (id, user_id, name, icon, color, is_default) VALUES (?, ?, ?, ?, ?, 0)'
+        'INSERT OR REPLACE INTO providers (id, user_id, name, icon, color, is_default) VALUES (?, ?, ?, ?, ?, 0)'
       )
         .bind(id, userId, name, icon, color)
         .run();

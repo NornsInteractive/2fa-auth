@@ -45,11 +45,11 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
 
     // Sync remote
     try {
-      fetchEncrypted(getApiUrl('/api/categories'), {
+      await fetchEncrypted(getApiUrl('/api/categories'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...input, userId }),
-      }).catch(() => {});
+        body: JSON.stringify({ ...newCategory, userId }),
+      });
     } catch (_) {}
 
     return newCategory;
@@ -83,9 +83,9 @@ export const useCategoryStore = create<CategoryState>((set, get) => ({
     await storage.set(getCategoryStorageKey(userId), next);
 
     try {
-      fetchEncrypted(getApiUrl(`/api/categories/${id}?userId=${userId}`), {
+      await fetchEncrypted(getApiUrl(`/api/categories/${id}?userId=${userId}`), {
         method: 'DELETE',
-      }).catch(() => {});
+      });
     } catch (_) {}
   },
 

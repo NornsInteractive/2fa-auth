@@ -81,11 +81,11 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
 
     // Sync remote
     try {
-      fetchEncrypted(getApiUrl('/api/providers'), {
+      await fetchEncrypted(getApiUrl('/api/providers'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...input, userId }),
-      }).catch(() => {});
+        body: JSON.stringify({ ...newProvider, userId }),
+      });
     } catch (_) {}
 
     return newProvider;
@@ -101,9 +101,9 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     await storage.set(getProviderStorageKey(userId), next);
 
     try {
-      fetchEncrypted(getApiUrl(`/api/providers/${id}?userId=${userId}`), {
+      await fetchEncrypted(getApiUrl(`/api/providers/${id}?userId=${userId}`), {
         method: 'DELETE',
-      }).catch(() => {});
+      });
     } catch (_) {}
   },
 }));

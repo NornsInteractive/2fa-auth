@@ -87,11 +87,11 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Try remote sync to Cloudflare Workers
     try {
-      fetchEncrypted(getApiUrl('/api/tokens'), {
+      await fetchEncrypted(getApiUrl('/api/tokens'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...newToken, userId }),
-      }).catch(() => {});
+      });
     } catch (_) {}
 
     return newToken;
@@ -115,11 +115,11 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Sync remote
     try {
-      fetchEncrypted(getApiUrl(`/api/tokens/${id}`), {
+      await fetchEncrypted(getApiUrl(`/api/tokens/${id}`), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...updates, userId }),
-      }).catch(() => {});
+      });
     } catch (_) {}
   },
 
@@ -131,9 +131,9 @@ export const useTokenStore = create<TokenState>((set, get) => ({
 
     // Sync remote
     try {
-      fetchEncrypted(getApiUrl(`/api/tokens/${id}?userId=${userId}`), {
+      await fetchEncrypted(getApiUrl(`/api/tokens/${id}?userId=${userId}`), {
         method: 'DELETE',
-      }).catch(() => {});
+      });
     } catch (_) {}
   },
 
