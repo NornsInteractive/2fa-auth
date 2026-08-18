@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, ActivityIndicator, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '../src/store/useAuthStore';
 import { useTokenStore } from '../src/store/useTokenStore';
@@ -16,6 +16,8 @@ import { AddTokenModal } from '../src/components/token/AddTokenModal';
 import { AddCategoryModal } from '../src/components/category/AddCategoryModal';
 import { TokenDetailModal } from '../src/components/token/TokenDetailModal';
 import { ImportExportModal } from '../src/components/common/ImportExportModal';
+import { UpdateModal } from '../src/components/common/UpdateModal';
+import { checkAppUpdate, UpdateInfo, APP_VERSION_CODE } from '../src/utils/updateChecker';
 import { Icon } from '../src/components/common/Icon';
 import { Token } from '../src/types/token';
 
@@ -46,6 +48,22 @@ export default function HomeScreen() {
   const [importExportVisible, setImportExportVisible] = useState(false);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedDetailToken, setSelectedDetailToken] = useState<Token | null>(null);
+
+  // App Update states
+  const [appUpdateInfo, setAppUpdateInfo] = useState<UpdateInfo | null>(null);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+
+  // Check for app updates on mobile on startup
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      checkAppUpdate(APP_VERSION_CODE).then((info) => {
+        if (info && info.latestVersionCode > APP_VERSION_CODE) {
+          setAppUpdateInfo(info);
+          setUpdateModalVisible(true);
+        }
+      }).catch(() => {});
+    }
+  }, []);
 
   // Check auth and redirect only once auth status has loaded
   useEffect(() => {
@@ -258,6 +276,13 @@ export default function HomeScreen() {
         visible={detailModalVisible}
         token={selectedDetailToken}
         onClose={() => setDetailModalVisible(false)}
+      />
+
+      {/* App Update Notification Modal */}
+      <UpdateModal
+        visible={updateModalVisible}
+        updateInfo={appUpdateInfo}
+        onClose={() => setUpdateModalVisible(false)}
       />
     </View>
   );

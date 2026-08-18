@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, useWindowDimensions, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Switch, useWindowDimensions, Modal, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSettingsStore } from '../src/store/useSettingsStore';
 import { useAuthStore } from '../src/store/useAuthStore';
@@ -10,6 +10,8 @@ import { Icon } from '../src/components/common/Icon';
 import { useToast } from '../src/components/common/Toast';
 import { FortressSidebar } from '../src/components/common/FortressSidebar';
 import { FortressBottomNav } from '../src/components/common/FortressBottomNav';
+import { UpdateModal } from '../src/components/common/UpdateModal';
+import { checkAppUpdate, UpdateInfo, APP_VERSION_NAME, APP_VERSION_CODE } from '../src/utils/updateChecker';
 import { ThemeColorKey, ThemeMode, Language } from '../src/types/settings';
 
 export default function SettingsScreen() {
@@ -44,9 +46,39 @@ export default function SettingsScreen() {
   const setSyncIntervalSeconds = useSettingsStore((s) => s.setSyncIntervalSeconds);
 
   const [clearModalVisible, setClearModalVisible] = useState(false);
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+  const [detectedUpdateInfo, setDetectedUpdateInfo] = useState<UpdateInfo | null>(null);
 
   const isDark = themeMode === 'dark';
   const palette = getColorPalette(themeColor, isDark);
+
+  const handleCheckUpdate = async (silent = false) => {
+    if (isCheckingUpdate) return;
+    try {
+      setIsCheckingUpdate(true);
+      const res = await checkAppUpdate(APP_VERSION_CODE);
+      if (res && res.latestVersionCode > APP_VERSION_CODE) {
+        setDetectedUpdateInfo(res);
+        setUpdateModalVisible(true);
+      } else {
+        if (!silent) {
+          showToast(
+            language === 'zh'
+              ? `当前已是最新版本 (v${APP_VERSION_NAME})`
+              : `Already up to date (v${APP_VERSION_NAME})`,
+            'check_circle'
+          );
+        }
+      }
+    } catch (_) {
+      if (!silent) {
+        showToast(language === 'zh' ? '检查更新失败，请检查网络' : 'Failed to check updates', 'error');
+      }
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
 
   const autoLockOptions = [
     { label: '1 ' + t('autoLockMinutes', language), value: 1 },
@@ -529,6 +561,40 @@ export default function SettingsScreen() {
                 </Text>
               </View>
 
+              {/* App Version & Check Updates */}
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => handleCheckUpdate(false)}
+                disabled={isCheckingUpdate}
+                style={[
+                  styles.cardRow,
+                  styles.clickableRow,
+                  { backgroundColor: palette.surfaceContainer, borderColor: palette.outlineVariant },
+                ]}
+              >
+                <View style={styles.rowLeftGroup}>
+                  <Icon name="system_update" size={20} color={palette.primary} />
+                  <View style={{ gap: 2 }}>
+                    <Text style={[styles.rowTitle, { color: palette.onSurface }]}>
+                      {language === 'zh' ? '检查软件更新' : 'Check for Updates'}
+                    </Text>
+                    <Text style={[styles.rowSub, { color: palette.onSurfaceVariant }]}>
+                      v{APP_VERSION_NAME} (Build {APP_VERSION_CODE})
+                    </Text>
+                  </View>
+                </View>
+                {isCheckingUpdate ? (
+                  <ActivityIndicator size="small" color={palette.primary} />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={{ fontSize: 12, color: palette.primary, fontWeight: '600' }}>
+                      {language === 'zh' ? '检查' : 'Check'}
+                    </Text>
+                    <Icon name="chevron_right" size={20} color={palette.onSurfaceVariant} />
+                  </View>
+                )}
+              </TouchableOpacity>
+
               {/* Reset Vault Button */}
               <TouchableOpacity
                 activeOpacity={0.7}
@@ -568,6 +634,13 @@ export default function SettingsScreen() {
           {!isDesktop && <FortressBottomNav />}
         </View>
       </View>
+
+      {/* Update Info Modal */}
+      <UpdateModal
+        visible={updateModalVisible}
+        updateInfo={detectedUpdateInfo}
+        onClose={() => setUpdateModalVisible(false)}
+      />
 
       {/* Clear Vault Confirmation Modal */}
       <Modal

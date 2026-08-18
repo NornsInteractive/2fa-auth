@@ -95,6 +95,35 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
             </Text>
           </TouchableOpacity>
 
+          {/* Web APK Download Button (Only displayed if EXPO_PUBLIC_APK_DOWNLOAD_URL is configured) */}
+          {Platform.OS === 'web' && (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || '').trim().length > 0 && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                const apkUrl = (process.env.EXPO_PUBLIC_APK_DOWNLOAD_URL || '').trim();
+                if (apkUrl && typeof window !== 'undefined') {
+                  window.open(apkUrl, '_blank');
+                }
+              }}
+              style={[
+                styles.iconButton,
+                {
+                  backgroundColor: palette.primaryContainer,
+                  flexDirection: 'row',
+                  paddingHorizontal: 10,
+                  width: 'auto',
+                  gap: 6,
+                },
+              ]}
+              accessibilityLabel="Download Android APK"
+            >
+              <Icon name="android" size={16} color="#ffffff" fill />
+              <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '700' }}>
+                {language === 'zh' ? '下载 APK' : 'APK'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           {/* GitHub Link */}
           <TouchableOpacity
             activeOpacity={0.7}
