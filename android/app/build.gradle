@@ -91,8 +91,8 @@ android {
         applicationId 'com.anonymous.mimir2faauth'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 3
+        versionName "1.0.2"
         externalNativeBuild {
             cmake {
                 cppFlags "-D_LIBCPP_ENABLE_CXX17_REMOVED_FEATURES -D_LIBCPP_ENABLE_CXX20_REMOVED_CHAR_TRAITS -include ${projectDir}/src/main/jni/fix_folly.h"
