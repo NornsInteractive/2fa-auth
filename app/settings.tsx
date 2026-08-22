@@ -691,8 +691,8 @@ export default function SettingsScreen() {
       <ApkDownloadModal
         visible={apkModalVisible}
         apkUrl={remoteApkUrl}
-        versionName="1.0.0"
-        fileSize="175.6 MB"
+        versionName={APP_VERSION_NAME}
+        fileSize="76 MB"
         onClose={() => setApkModalVisible(false)}
       />
 

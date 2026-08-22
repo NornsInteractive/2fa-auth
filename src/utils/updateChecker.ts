@@ -19,9 +19,9 @@ export interface UpdateInfo {
   releaseTime?: string;
 }
 
-// Current App Version Constants
-export const APP_VERSION_NAME = '1.0.0';
-export const APP_VERSION_CODE = 1;
+// Current App Version Constants (Synchronized across build.gradle, app.json, package.json)
+export const APP_VERSION_NAME = '1.0.3';
+export const APP_VERSION_CODE = 4;
 export const APP_PACKAGE_ID = 'com.anonymous.mimir2faauth';
 
 // Yggdrasil API Server URL
@@ -62,7 +62,7 @@ export async function checkAppUpdate(
         iconUrl: data.icon_url,
         currentVersionCode: data.current_version_code || currentVersionCode,
         latestVersionCode: data.latest_version_code || currentVersionCode,
-        latestVersionName: data.latest_version_name || '1.0.0',
+        latestVersionName: data.latest_version_name || APP_VERSION_NAME,
         minVersionCode: data.min_version_code || 1,
         channel: data.channel || 'default',
         changelog: data.changelog || '',

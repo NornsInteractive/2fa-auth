@@ -13,6 +13,7 @@ import {
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { getColorPalette } from '../../theme/colors';
 import { Icon } from './Icon';
+import { APP_VERSION_NAME } from '../../utils/updateChecker';
 import { useToast } from './Toast';
 
 interface ApkDownloadModalProps {
@@ -26,8 +27,8 @@ interface ApkDownloadModalProps {
 export const ApkDownloadModal: React.FC<ApkDownloadModalProps> = ({
   visible,
   apkUrl,
-  versionName = '1.0.0',
-  fileSize = '175.6 MB',
+  versionName = APP_VERSION_NAME,
+  fileSize = '76 MB',
   onClose,
 }) => {
   const themeMode = useSettingsStore((s) => s.themeMode);

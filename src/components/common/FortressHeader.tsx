@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useSettingsStore } from '../../store/useSettingsStore';
 import { useTokenStore } from '../../store/useTokenStore';
 import { getColorPalette, THEME_COLOR_OPTIONS } from '../../theme/colors';
+import { APP_VERSION_NAME } from '../../utils/updateChecker';
 import { t } from '../../utils/i18n';
 import { Icon } from './Icon';
 import { GitHubIcon } from './GitHubIcon';
@@ -343,8 +344,8 @@ export const FortressHeader: React.FC<FortressHeaderProps> = ({ onOpenAddModal, 
       <ApkDownloadModal
         visible={apkModalVisible}
         apkUrl={remoteApkUrl}
-        versionName="1.0.0"
-        fileSize="175.6 MB"
+        versionName={APP_VERSION_NAME}
+        fileSize="76 MB"
         onClose={() => setApkModalVisible(false)}
       />
     </View>
